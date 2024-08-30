@@ -1,2 +1,2 @@
 # ss-gpu
-Explore ways to speedup linear static, linear buckling and nonlinear static structural analyses using GPUs in C++, Python
+Use GPUs to speedup linear static, linear buckling and nonlinear static structural analyses (finite element) using GPUs in C++ and Python.

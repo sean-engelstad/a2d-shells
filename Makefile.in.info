@@ -1,0 +1,7 @@
+OFLAGS = -Wall -g
+CFLAGS = -c
+CC = g++
+exec = test_sym
+
+SO_LINK_FLAGS=-fPIC -shared
+SS_GPU_DIR = ${HOME}/git/ss-gpu

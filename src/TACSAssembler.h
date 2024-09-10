@@ -17,4 +17,7 @@ private:
     int varsPerNode;         // number of variables per node
     int numElements;         // number of elements
     int numNodes;            // number of nodes referenced by this process
+
+    // The local list of elements
+    TACSElement **elements;
 };

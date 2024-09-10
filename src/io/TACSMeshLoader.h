@@ -45,25 +45,9 @@
 
 const int TacsMeshLoaderNumElementTypes = 10;
 
-extern const char *TacsMeshLoaderElementTypes[10];
-// extern const char *TacsMeshLoaderElementTypes[] = {
-//     "CBAR",  "CQUADR",  "CQUAD4", "CQUAD8", "CQUAD9",
-//     "CQUAD", "CHEXA27", "CHEXA",  "CTRIA3", "CTETRA"};
+extern const char *TacsMeshLoaderElementTypes[TacsMeshLoaderNumElementTypes];
 
-// Lower and upper limits for the number of nodes
-// int *TacsMeshLoaderElementLimits[TacsMeshLoaderNumElementTypes];
-
-extern const int TacsMeshLoaderElementLimits[10][2];
-// extern const int TacsMeshLoaderElementLimits[][2] = {{2, 2},    // CBAR
-//                                               {4, 4},    // CQUADR
-//                                               {4, 4},    // CQUAD4
-//                                               {8, 8},    // CQUAD8
-//                                               {9, 9},    // CQUAD9
-//                                               {9, 9},    // CQUAD
-//                                               {27, 27},  // CHEXA27
-//                                               {8, 8},    // CHEXA
-//                                               {3, 3},    // CTRIA3
-//                                               {4, 10}};  // CTETRA
+extern const int TacsMeshLoaderElementLimits[TacsMeshLoaderNumElementTypes][2];
 
 class TACSMeshLoader : public TACSObject {
  public:

@@ -1,5 +1,5 @@
 include Makefile.in.info
-include SS_GPU.mk
+include A2D_SHELLS.mk
 
 
 default: ${MY_OBJS}

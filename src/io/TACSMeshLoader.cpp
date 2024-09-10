@@ -22,11 +22,11 @@
 #include <stdlib.h>
 #include <string.h>
 
-const char* TacsMeshLoaderElementTypes[10] = {
+const char* TacsMeshLoaderElementTypes[TacsMeshLoaderNumElementTypes] = {
     "CBAR",  "CQUADR",  "CQUAD4", "CQUAD8", "CQUAD9",
     "CQUAD", "CHEXA27", "CHEXA",  "CTRIA3", "CTETRA"};
 
-const int TacsMeshLoaderElementLimits[10][2] = {{2, 2},    // CBAR
+const int TacsMeshLoaderElementLimits[TacsMeshLoaderNumElementTypes][2] = {{2, 2},    // CBAR
                               {4, 4},    // CQUADR
                               {4, 4},    // CQUAD4
                               {8, 8},    // CQUAD8

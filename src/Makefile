@@ -1,5 +1,5 @@
 include ../Makefile.in
-include ../SS_GPU.mk
+include ../A2D_SHELLS.mk
 
 default: TACSObject.o
 

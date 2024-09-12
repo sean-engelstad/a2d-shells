@@ -1118,61 +1118,20 @@ int TACSMeshLoader::getNumNodes() { return num_nodes; }
 // /*
 //   Create a distributed version of TACS
 // */
-// TACSAssembler *TACSMeshLoader::createTACS(
-//     int vars_per_node, TACSAssembler::OrderingType order_type,
-//     TACSAssembler::MatrixOrderingType mat_type) {
-//   // Set the root processor
-//   const int root = 0;
+TACSAssembler *TACSMeshLoader::createTACS(
+    int vars_per_node) {
+  
+  TACSAssembler *assembler = new TACSAssembler(vars_per_node, num_elements);
 
-//   // Get the rank of the current processor
-//   int rank;
-//   MPI_Comm_rank(comm, &rank);
+  // TODO complete this step..
+  // assembler->setElementConnectivity();
+  // assembler->setElements();
+  // assembler->addBCs();
+  // assembler->initialize();
+  // assembler->setNodes();
 
-//   // Allocate the TACS creator
-//   creator = new TACSCreator(comm, vars_per_node);
-//   creator->incref();
-
-//   // Set the ordering type and matrix type
-//   creator->setReorderingType(order_type, mat_type);
-
-//   if (rank == root) {
-//     // Set the connectivity
-//     creator->setGlobalConnectivity(num_nodes, num_elements, elem_node_ptr,
-//                                    elem_node_conn, elem_component);
-
-//     // Set the boundary conditions
-//     creator->setBoundaryConditions(num_bcs, bc_nodes, bc_ptr, bc_vars, bc_vals);
-
-//     // Set the nodal locations
-//     creator->setNodes(Xpts);
-
-//     // Free things that are no longer required
-//     delete[] elem_node_ptr;
-//     elem_node_ptr = NULL;
-//     delete[] elem_node_conn;
-//     elem_node_conn = NULL;
-//     delete[] elem_component;
-//     elem_component = NULL;
-
-//     // Free the boundary conditions
-//     delete[] bc_nodes;
-//     bc_nodes = NULL;
-//     delete[] bc_ptr;
-//     bc_ptr = NULL;
-//     delete[] bc_vars;
-//     bc_vars = NULL;
-//     delete[] bc_vals;
-//     bc_vals = NULL;
-//   }
-
-//   // This call must occur on all processor
-//   creator->setElements(num_components, elements);
-
-//   // Create the TACSAssembler object
-//   TACSAssembler *tacs = creator->createTACS();
-
-//   return tacs;
-// }
+  return assembler;
+}
 
 /*
   Retrieve the number of elements owned by this processes

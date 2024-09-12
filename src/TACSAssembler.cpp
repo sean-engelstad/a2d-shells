@@ -33,9 +33,9 @@ void TACSAssembler::evalEnergies(TacsScalar *Te, TacsScalar *Pe) {
     int ptr = elementNodeIndex[i];
     int len = elementNodeIndex[i + 1] - ptr;
     const int *nodes = &elementTacsNodes[ptr];
-    xptVec->getValues(len, nodes, elemXpts);
-    varsVec->getValues(len, nodes, vars);
-    dvarsVec->getValues(len, nodes, dvars);
+    // xptVec->getValues(len, nodes, elemXpts);
+    // varsVec->getValues(len, nodes, vars);
+    // dvarsVec->getValues(len, nodes, dvars);
 
     // Compute and add the element's contributions to the total
     // energy
@@ -60,12 +60,13 @@ void TACSAssembler::evalEnergies(TacsScalar *Te, TacsScalar *Pe) {
   @param residual The residual vector
   @param lambda Scaling factor for the aux element contributions, by default 1
 */
-void TACSAssembler::assembleRes(TACSBVec *residual, const TacsScalar lambda) {
+void TACSAssembler::assembleRes(TacsScalar *residual, const TacsScalar lambda) {
   // Sort the list of auxiliary elements - this only performs the
   // sort if it is required (if new elements are added)
 
   // Zero the residual
-  residual->zeroEntries();
+  // residual->zeroEntries();
+  memset(residual, 0.0, getNumVariables()*sizeof(TacsScalar));
 
   // Retrieve pointers to temporary storage
   TacsScalar *vars, *dvars, *ddvars, *elemRes, *elemXpts;
@@ -77,10 +78,10 @@ void TACSAssembler::assembleRes(TACSBVec *residual, const TacsScalar lambda) {
     int ptr = elementNodeIndex[i];
     int len = elementNodeIndex[i + 1] - ptr;
     const int *nodes = &elementTacsNodes[ptr];
-    xptVec->getValues(len, nodes, elemXpts);
-    varsVec->getValues(len, nodes, vars);
-    dvarsVec->getValues(len, nodes, dvars);
-    ddvarsVec->getValues(len, nodes, ddvars);
+    // xptVec->getValues(len, nodes, elemXpts);
+    // varsVec->getValues(len, nodes, vars);
+    // dvarsVec->getValues(len, nodes, dvars);
+    // ddvarsVec->getValues(len, nodes, ddvars);
 
     // Add the residual from the working element
     int nvars = elements[i]->getNumVariables();
@@ -88,16 +89,62 @@ void TACSAssembler::assembleRes(TACSBVec *residual, const TacsScalar lambda) {
     elements[i]->addResidual(i, time, elemXpts, vars, dvars, ddvars, elemRes);
 
     // Add the residual values
-    residual->setValues(len, nodes, elemRes, TACS_ADD_VALUES);
+    // residual->setValues(len, nodes, elemRes, TACS_ADD_VALUES);
   }
 
   
   // Finish transmitting the residual
-  residual->beginSetValues(TACS_ADD_VALUES);
-  residual->endSetValues(TACS_ADD_VALUES);
+  // residual->beginSetValues(TACS_ADD_VALUES);
+  // residual->endSetValues(TACS_ADD_VALUES);
 
   // Apply the boundary conditions for the residual
-  residual->applyBCs(bcMap, varsVec);
+  // residual->applyBCs(bcMap, varsVec);
+}
+
+/**
+  Get pointers to the element data. This code provides a way to
+  automatically segment an array to avoid coding mistakes.
+
+  Note that this is coded in such a way that you can provide NULL
+  arguments
+*/
+void TACSAssembler::getDataPointers(TacsScalar *data, TacsScalar **v1,
+                                    TacsScalar **v2, TacsScalar **v3,
+                                    TacsScalar **v4, TacsScalar **x1,
+                                    TacsScalar **x2, TacsScalar **weights,
+                                    TacsScalar **mat) {
+  int s = 0;
+  if (v1) {
+    *v1 = &data[s];
+    s += maxElementSize;
+  }
+  if (v2) {
+    *v2 = &data[s];
+    s += maxElementSize;
+  }
+  if (v3) {
+    *v3 = &data[s];
+    s += maxElementSize;
+  }
+  if (v4) {
+    *v4 = &data[s];
+    s += maxElementSize;
+  }
+  if (x1) {
+    *x1 = &data[s];
+    s += TACS_SPATIAL_DIM * maxElementNodes;
+  };
+  if (x2) {
+    *x2 = &data[s];
+    s += TACS_SPATIAL_DIM * maxElementNodes;
+  };
+  if (weights) {
+    *weights = &data[s];
+    s += maxElementIndepNodes;
+  }
+  if (mat) {
+    *mat = &data[s];
+  }
 }
 
 /**
@@ -121,13 +168,14 @@ void TACSAssembler::assembleRes(TACSBVec *residual, const TacsScalar lambda) {
 */
 void TACSAssembler::assembleJacobian(TacsScalar alpha, TacsScalar beta,
                                      TacsScalar gamma, TacsScalar *residual,
-                                     TacsMat *A, MatrixOrientation matOr,
-                                     const TacsScalar lambda) {
+                                     TacsScalar *A, const TacsScalar lambda) {
   // Zero the residual and the matrix
   if (residual) {
-    residual->zeroEntries();
+    // residual->zeroEntries();
+    memset(residual, 0.0, getNumVariables()*sizeof(TacsScalar));
   }
-  A->zeroEntries();
+  // A->zeroEntries();
+  memset(A, 0.0, getNumVariables()*sizeof(TacsScalar));
 
   // Retrieve pointers to temporary storage
   TacsScalar *vars, *dvars, *ddvars, *elemRes, *elemXpts;
@@ -139,10 +187,10 @@ void TACSAssembler::assembleJacobian(TacsScalar alpha, TacsScalar beta,
     int ptr = elementNodeIndex[i];
     int len = elementNodeIndex[i + 1] - ptr;
     const int *nodes = &elementTacsNodes[ptr];
-    xptVec->getValues(len, nodes, elemXpts);
-    varsVec->getValues(len, nodes, vars);
-    dvarsVec->getValues(len, nodes, dvars);
-    ddvarsVec->getValues(len, nodes, ddvars);
+    // xptVec->getValues(len, nodes, elemXpts);
+    // varsVec->getValues(len, nodes, vars);
+    // dvarsVec->getValues(len, nodes, dvars);
+    // ddvarsVec->getValues(len, nodes, ddvars);
 
     // Get the number of variables from the element
     int nvars = elements[i]->getNumVariables();
@@ -153,28 +201,28 @@ void TACSAssembler::assembleJacobian(TacsScalar alpha, TacsScalar beta,
     elements[i]->addJacobian(i, time, alpha, beta, gamma, elemXpts, vars,
                               dvars, ddvars, elemRes, elemMat);
 
-    if (residual) {
-      residual->setValues(len, nodes, elemRes, TACS_ADD_VALUES);
-    }
-    addMatValues(A, i, elemMat, elementIData, elemWeights, matOr);
+    // if (residual) {
+    //   residual->setValues(len, nodes, elemRes, TACS_ADD_VALUES);
+    // }
+    // addMatValues(A, i, elemMat, elementIData, elemWeights, matOr);
   }
 
   // Do any matrix and residual assembly if required
-  A->beginAssembly();
-  if (residual) {
-    residual->beginSetValues(TACS_ADD_VALUES);
-  }
+  // A->beginAssembly();
+  // if (residual) {
+  //   residual->beginSetValues(TACS_ADD_VALUES);
+  // }
 
-  A->endAssembly();
-  if (residual) {
-    residual->endSetValues(TACS_ADD_VALUES);
-  }
+  // A->endAssembly();
+  // if (residual) {
+  //   residual->endSetValues(TACS_ADD_VALUES);
+  // }
 
   // Apply the boundary conditions
-  if (residual) {
-    residual->applyBCs(bcMap, varsVec);
-  }
+  // if (residual) {
+  //   residual->applyBCs(bcMap, varsVec);
+  // }
 
   // Apply the appropriate boundary conditions
-  A->applyBCs(bcMap);
+  // A->applyBCs(bcMap);
 }

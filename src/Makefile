@@ -1,7 +1,10 @@
 include ../Makefile.in
 include ../A2D_SHELLS.mk
 
-default: TACSObject.o TACSAssembler.o
+CXX_OBJS = TACSObject.o \
+		TACSAssembler.o
+
+default: ${CXX_OBJS}
 
 clean:
 	rm -f *.o

@@ -8,6 +8,10 @@ default: ${MY_OBJS}
 		echo; (cd $$subdir && $(MAKE)) || exit 1; \
 		done \
 
+new:
+	$(MAKE) clean
+	$(MAKE) default
+
 clean:
 	rm -f *.o
 	rm -f **/*.o

@@ -7,8 +7,22 @@
 
 
 #include "TACSAssembler.h"
+#include <iostream>
 
-TACSAssembler::TACSAssembler(int _varsPerNode, int _numElements) : varsPerNode(_varsPerNode), numElements(_numElements) {};
+TACSAssembler::TACSAssembler(int _varsPerNode, int _numElements) : varsPerNode(_varsPerNode), numElements(_numElements) 
+{
+  meshInitializedFlag = 0;
+  elements = NULL;
+  time = 0.0;
+
+  // These values will be computed later
+  numMultiplierNodes = 0;
+  numNodes = 0;
+  maxElementNodes = 0;
+  maxElementSize = 0;
+  elementNodeIndex = NULL;
+  elementTacsNodes = NULL;
+};
 TACSAssembler::~TACSAssembler() {};
 
 /**
@@ -99,6 +113,161 @@ void TACSAssembler::assembleRes(TacsScalar *residual, const TacsScalar lambda) {
 
   // Apply the boundary conditions for the residual
   // residual->applyBCs(bcMap, varsVec);
+}
+
+/**
+  Set the element connectivity.
+
+  Note that the number of elements that are set at this stage must be
+  consistent with the number of elements passed in when TACSAssembler
+  is created.  (The connectivity arrays are copied and should be freed
+  by the caller.)
+
+  @param ptr Offset into the connectivity array for this processor
+  @param conn The connectivity from elements to global node index
+  @return Fail flag indicating if a failure occured
+*/
+int TACSAssembler::setElementConnectivity(const int *ptr, const int *conn) {
+  // if (meshInitializedFlag) {
+  //   fprintf(stderr,
+  //           "Cannot call setElementConnectivity() after initialize()\n");
+  //   return 1;
+  // }
+  // if (tacsExtNodeNums) {
+  //   fprintf(stderr,
+  //           "Cannot call setElementConnectivity() after reordering\n");
+  //   return 1;
+  // }
+
+  // Free the data if it has already been set before
+  if (elementTacsNodes) {
+    delete[] elementTacsNodes;
+  }
+  if (elementNodeIndex) {
+    delete[] elementNodeIndex;
+  }
+
+  int size = ptr[numElements];
+  elementNodeIndex = new int[numElements + 1];
+  elementTacsNodes = new int[size];
+  memcpy(elementNodeIndex, ptr, (numElements + 1) * sizeof(int));
+
+  // Copy the node numbers
+  memcpy(elementTacsNodes, conn, size * sizeof(int));
+
+  // If the elements are set, check the connectivity
+  if (elements) {
+    for (int i = 0; i < numElements; i++) {
+      int size = elementNodeIndex[i + 1] - elementNodeIndex[i];
+      if (size != elements[i]->getNumNodes()) {
+        fprintf(stderr,
+                "TACSAssembler: Element %s does not match "
+                " connectivity\n", elements[i]->getObjectName());
+        return 1;
+      }
+    }
+  }
+
+  return 0;
+}
+
+/**
+  Set the element array within TACS.
+
+  The number of element pointers provided should be equal to the
+  number of elements specified in the TACSAssembler constructor.  Note
+  that the elements themselves are not copied, just the pointers to
+  them.
+
+  @param elements The array of element pointers with length = numElements.
+  @return Fail flag indicating if a failure occured
+*/
+int TACSAssembler::setElements(TACSElement **_elements) {
+  printf("Inside setElements()\n");
+  std::cout << std::flush;
+
+  if (meshInitializedFlag) {
+    fprintf(stderr, "Cannot call setElements() after initialize()\n");
+    return 1;
+  }
+
+  printf("Checkpt1\n");
+  std::cout << std::flush;
+
+  // Check if the number of variables per node matches
+  for (int i = 0; i < numElements; i++) {
+    if (_elements[i]->getVarsPerNode() != varsPerNode) {
+      fprintf(stderr,
+              "TACSAssembler: Element %s, num displacements %d "
+              "does not match variables per node %d\n",
+              _elements[i]->getObjectName(),
+              _elements[i]->getVarsPerNode(), varsPerNode);
+      return 1;
+    }
+  }
+
+  // Copy over the element pointers into a local array
+  printf("Pre copy elements\n");
+  std::cout << std::flush;
+  if (elements) {
+    for (int i = 0; i < numElements; i++) {
+      _elements[i]->incref();
+      if (elements[i]) {
+        elements[i]->decref();
+      }
+      elements[i] = _elements[i];
+    }
+  } else {
+    elements = new TACSElement *[numElements];
+    memset(elements, 0, numElements * sizeof(TACSElement *));
+    for (int i = 0; i < numElements; i++) {
+      _elements[i]->incref();
+      elements[i] = _elements[i];
+    }
+  }
+
+  // Keep track of the number of multiplier nodes
+  numMultiplierNodes = 0;
+
+  // Determine the maximum number of nodes per element
+  maxElementSize = 0;
+  maxElementNodes = 0;
+
+  for (int i = 0; i < numElements; i++) {
+    // Determine if the maximum number of variables and nodes needs to
+    // be changed
+    int elemSize = elements[i]->getNumVariables();
+    if (elemSize > maxElementSize) {
+      maxElementSize = elemSize;
+    }
+
+    elemSize = elements[i]->getNumNodes();
+    if (elemSize > maxElementNodes) {
+      maxElementNodes = elemSize;
+    }
+
+    // Count up the multiplier nodes
+    int multiplier = elements[i]->getMultiplierIndex();
+    if (multiplier > 0) {
+      numMultiplierNodes++;
+    }
+
+  }
+
+  // If the connectivity is set, determine if it is consistent
+  if (elementNodeIndex) {
+    for (int i = 0; i < numElements; i++) {
+      int size = elementNodeIndex[i + 1] - elementNodeIndex[i];
+      if (size != elements[i]->getNumNodes()) {
+        fprintf(stderr,
+                "TACSAssembler: Element %s does not match "
+                "connectivity\n", elements[i]->getObjectName());
+        return 1;
+      }
+    }
+  }
+
+  return 0;
 }
 
 /**

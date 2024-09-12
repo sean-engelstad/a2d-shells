@@ -122,7 +122,7 @@ class TACSMeshLoader : public TACSObject {
   // TACSCreator *creator;
 
   // The element corresponding to each of the component numbers
-  // TACSElement **elements;
+  TACSElement **elements;
 
   // Original BDF mesh information: Note that the original
   // ordering may not be contiguous. The node numbers associated

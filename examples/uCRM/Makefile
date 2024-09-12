@@ -9,5 +9,11 @@ loadmesh:
 runcrm:
 	$(CC) $(OFLAGS) ${MY_OBJS} RunCRM.o -o runcrm
 
+new:
+	$(MAKE) clean
+	$(MAKE) default
+
 clean:
 	rm -f *.o
+	rm loadmesh
+	rm runcrm

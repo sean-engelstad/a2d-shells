@@ -56,6 +56,13 @@ class TACSElement : public TACSObject {
   int getComponentNum() { return componentNum; }
 
   /**
+    Get a string representation of the element name
+
+    @return The name of the element
+  */
+  const char *getObjectName() { return "TACSElement"; }
+
+  /**
     Get the number of degrees of freedom per node for this element
 
     @return The number of degrees of freedom per node

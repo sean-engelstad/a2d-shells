@@ -32,6 +32,11 @@ public:
     TacsScalar *getBcMap();
     TacsScalar *getInitBcMap();
 
+    // set elements and conn
+    // -----------------------------------------------
+    int setElementConnectivity(const int *ptr, const int *conn);
+    int setElements(TACSElement **_elements);
+
     // Return elements and node numbers
     // --------------------------------
     TACSElement **getElements();
@@ -63,7 +68,11 @@ private:
     TacsScalar *elementData;
     int *elementIData;
 
+    // variables/elements have been initialized
+    int meshInitializedFlag;
+
     // Maximum element information
+    int numMultiplierNodes;
     int maxElementNodes;       // maximum number of ind. and dep. element nodes
     int maxElementSize;        // maximum number of variables for any element
     int maxElementIndepNodes;  // maximum number of independent nodes

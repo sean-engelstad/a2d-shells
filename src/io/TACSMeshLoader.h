@@ -42,28 +42,13 @@
 // #include "TACSCreator.h"
 // #include "TACSToFH5.h"
 #include "TACSObject.h"
+#include "TACSAssembler.h"
 
 const int TacsMeshLoaderNumElementTypes = 10;
 
-extern const char *TacsMeshLoaderElementTypes[10];
-// extern const char *TacsMeshLoaderElementTypes[] = {
-//     "CBAR",  "CQUADR",  "CQUAD4", "CQUAD8", "CQUAD9",
-//     "CQUAD", "CHEXA27", "CHEXA",  "CTRIA3", "CTETRA"};
+extern const char *TacsMeshLoaderElementTypes[TacsMeshLoaderNumElementTypes];
 
-// Lower and upper limits for the number of nodes
-// int *TacsMeshLoaderElementLimits[TacsMeshLoaderNumElementTypes];
-
-extern const int TacsMeshLoaderElementLimits[10][2];
-// extern const int TacsMeshLoaderElementLimits[][2] = {{2, 2},    // CBAR
-//                                               {4, 4},    // CQUADR
-//                                               {4, 4},    // CQUAD4
-//                                               {8, 8},    // CQUAD8
-//                                               {9, 9},    // CQUAD9
-//                                               {9, 9},    // CQUAD
-//                                               {27, 27},  // CHEXA27
-//                                               {8, 8},    // CHEXA
-//                                               {3, 3},    // CTRIA3
-//                                               {4, 10}};  // CTETRA
+extern const int TacsMeshLoaderElementLimits[TacsMeshLoaderNumElementTypes][2];
 
 class TACSMeshLoader : public TACSObject {
  public:
@@ -102,6 +87,8 @@ class TACSMeshLoader : public TACSObject {
   //     int vars_per_node,
   //     TACSAssembler::OrderingType order_type = TACSAssembler::NATURAL_ORDER,
   //     TACSAssembler::MatrixOrderingType mat_type = TACSAssembler::DIRECT_SCHUR);
+  TACSAssembler *createTACS(
+      int vars_per_node);
 
   // Set the domain of a structural function with component numbers
   // --------------------------------------------------------------
@@ -135,7 +122,7 @@ class TACSMeshLoader : public TACSObject {
   // TACSCreator *creator;
 
   // The element corresponding to each of the component numbers
-  // TACSElement **elements;
+  TACSElement **elements;
 
   // Original BDF mesh information: Note that the original
   // ordering may not be contiguous. The node numbers associated

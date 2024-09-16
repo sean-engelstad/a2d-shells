@@ -4,4 +4,4 @@ CC = g++
 exec = test_sym
 
 SO_LINK_FLAGS=-fPIC -shared
-SS_GPU_DIR = ${HOME}/git/ss-gpu
+A2D_SHELLS_DIR = ${HOME}/git/a2d-shells

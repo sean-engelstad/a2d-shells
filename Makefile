@@ -1,5 +1,5 @@
 include Makefile.in.info
-include SS_GPU.mk
+include A2D_SHELLS.mk
 
 
 default: ${MY_OBJS}
@@ -7,6 +7,10 @@ default: ${MY_OBJS}
 		echo "making $@ in $$subdir"; \
 		echo; (cd $$subdir && $(MAKE)) || exit 1; \
 		done \
+
+new:
+	$(MAKE) clean
+	$(MAKE) default
 
 clean:
 	rm -f *.o

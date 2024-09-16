@@ -1,7 +1,10 @@
 include ../Makefile.in
-include ../SS_GPU.mk
+include ../A2D_SHELLS.mk
 
-default: TACSObject.o
+CXX_OBJS = TACSObject.o \
+		TACSAssembler.o
+
+default: ${CXX_OBJS}
 
 clean:
 	rm -f *.o

@@ -21,12 +21,13 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <iostream>
 
-const char* TacsMeshLoaderElementTypes[10] = {
+const char* TacsMeshLoaderElementTypes[TacsMeshLoaderNumElementTypes] = {
     "CBAR",  "CQUADR",  "CQUAD4", "CQUAD8", "CQUAD9",
     "CQUAD", "CHEXA27", "CHEXA",  "CTRIA3", "CTETRA"};
 
-const int TacsMeshLoaderElementLimits[10][2] = {{2, 2},    // CBAR
+const int TacsMeshLoaderElementLimits[TacsMeshLoaderNumElementTypes][2] = {{2, 2},    // CBAR
                               {4, 4},    // CQUADR
                               {4, 4},    // CQUAD4
                               {8, 8},    // CQUAD8
@@ -1077,10 +1078,10 @@ int TACSMeshLoader::scanBDFFile(const char *file_name) {
   // MPI_Bcast(component_elems, 9 * num_components, MPI_CHAR, root, comm);
   // MPI_Bcast(component_descript, 33 * num_components, MPI_CHAR, root, comm);
 
-  // elements = new TACSElement *[num_components];
-  // for (int k = 0; k < num_components; k++) {
-  //   elements[k] = NULL;
-  // }
+  elements = new TACSElement *[num_components];
+  for (int k = 0; k < num_components; k++) {
+    elements[k] = NULL;
+  }
 
   return fail;
 }
@@ -1118,136 +1119,29 @@ int TACSMeshLoader::getNumNodes() { return num_nodes; }
 // /*
 //   Create a distributed version of TACS
 // */
-// TACSAssembler *TACSMeshLoader::createTACS(
-//     int vars_per_node, TACSAssembler::OrderingType order_type,
-//     TACSAssembler::MatrixOrderingType mat_type) {
-//   // Set the root processor
-//   const int root = 0;
+TACSAssembler *TACSMeshLoader::createTACS(
+    int vars_per_node) {
+  
+  TACSAssembler *assembler = new TACSAssembler(vars_per_node, num_elements);
 
-//   // Get the rank of the current processor
-//   int rank;
-//   MPI_Comm_rank(comm, &rank);
+  // TODO complete this step..
+  // std::cout << std::flush;
+  printf("Set element conn\n");
+  assembler->setElementConnectivity(elem_node_ptr, elem_node_conn);
+  printf("Set elements\n");
+  std::cout << std::flush;
+  assembler->setElements(elements);
+  // assembler->addBCs();
+  // assembler->initialize();
+  // assembler->setNodes();
 
-//   // Allocate the TACS creator
-//   creator = new TACSCreator(comm, vars_per_node);
-//   creator->incref();
-
-//   // Set the ordering type and matrix type
-//   creator->setReorderingType(order_type, mat_type);
-
-//   if (rank == root) {
-//     // Set the connectivity
-//     creator->setGlobalConnectivity(num_nodes, num_elements, elem_node_ptr,
-//                                    elem_node_conn, elem_component);
-
-//     // Set the boundary conditions
-//     creator->setBoundaryConditions(num_bcs, bc_nodes, bc_ptr, bc_vars, bc_vals);
-
-//     // Set the nodal locations
-//     creator->setNodes(Xpts);
-
-//     // Free things that are no longer required
-//     delete[] elem_node_ptr;
-//     elem_node_ptr = NULL;
-//     delete[] elem_node_conn;
-//     elem_node_conn = NULL;
-//     delete[] elem_component;
-//     elem_component = NULL;
-
-//     // Free the boundary conditions
-//     delete[] bc_nodes;
-//     bc_nodes = NULL;
-//     delete[] bc_ptr;
-//     bc_ptr = NULL;
-//     delete[] bc_vars;
-//     bc_vars = NULL;
-//     delete[] bc_vals;
-//     bc_vals = NULL;
-//   }
-
-//   // This call must occur on all processor
-//   creator->setElements(num_components, elements);
-
-//   // Create the TACSAssembler object
-//   TACSAssembler *tacs = creator->createTACS();
-
-//   return tacs;
-// }
+  return assembler;
+}
 
 /*
   Retrieve the number of elements owned by this processes
 */
 int TACSMeshLoader::getNumElements() { return num_elements; }
-
-/*
-  Set the function domain
-
-  Given the function, and the set of component numbers that define the
-  domain of interest, set the element numbers in the function that
-*/
-// void TACSMeshLoader::addFunctionDomain(TACSFunction *function, int num_comps,
-//                                        int comp_nums[]) {
-//   if (creator) {
-//     int *elems;
-//     int num_elems = creator->getElementIdNums(num_comps, comp_nums, &elems);
-//     function->addDomain(num_elems, elems);
-//     delete[] elems;
-//   }
-// }
-
-// /*
-//   Add the auxiliary element to the given domain specified by the
-//   component number
-// */
-// void TACSMeshLoader::addAuxElement(TACSAuxElements *aux, int component_num,
-//                                    TACSElement *element) {
-//   if (creator) {
-//     int *elems;
-//     int num_elems = creator->getElementIdNums(1, &component_num, &elems);
-//     for (int i = 0; i < num_elems; i++) {
-//       aux->addElement(elems[i], element);
-//     }
-//     delete[] elems;
-//   }
-// }
-
-/**
-  Given node numbers from the original file on the root processor,
-  find the corresponding global node numbers in the given assembler object.
-
-  Note that the node numbers are assumed to be 1-based as is the case in the
-  original file format. In addition, the node array is over-written by a
-  temporary ordering. The number of nodes and their numbers are returned in
-  a newly allocated array.
-*/
-// void TACSMeshLoader::getAssemblerNodeNums(TACSAssembler *assembler,
-//                                           int num_nodes, int *node_nums,
-//                                           int *num_new_nodes, int **new_nodes) {
-//   *num_new_nodes = 0;
-//   *new_nodes = NULL;
-
-//   if (creator) {
-//     int rank;
-//     MPI_Comm_rank(comm, &rank);
-
-//     int index = 0;
-//     if (rank == 0) {
-//       // Convert from the BDF order, to the local TACSMeshLoader order
-//       for (int k = 0; k < num_nodes; k++) {
-//         int node_num = node_nums[k] - 1;
-//         int node = find_index_arg_sorted(node_num, num_nodes, file_node_nums,
-//                                          node_arg_sort_list);
-//         if (node >= 0) {
-//           node_nums[index] = node;
-//           index++;
-//         }
-//       }
-//     }
-
-//     creator->getAssemblerNodeNums(assembler, index, node_nums, num_new_nodes,
-//                                   new_nodes);
-//   }
-// }
 
 /*
   Get the element connectivity and node locations

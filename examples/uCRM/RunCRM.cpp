@@ -10,6 +10,9 @@ int main() {
     mesh->incref();
     mesh->scanBDFFile("CRM_box_2nd.bdf");
 
+    // TODO : need to make an explicit shell element here which will be copied
+    // for all conn / elements in the mesh (make this before creating TACS)
+
     // make the TACS assembler
     printf("Creating TACS assembler\n");
     TACSAssembler *assembler = mesh->createTACS(6);

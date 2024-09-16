@@ -1,7 +1,10 @@
 include ../../Makefile.in
 include ../../A2D_SHELLS.mk
 
-CXX_OBJS = TACSConstitutive.o
+CXX_OBJS = TACSConstitutive.o \
+           TACSIsoShellConstitutive.o \
+		   TACSMaterialProperties.o \
+		   TACSShellConstitutive.o
 
 default: ${CXX_OBJS}
 

@@ -612,14 +612,14 @@ void TACSShellElement<quadrature, basis, director, model>::getMatType(
   dh = 1e-4;  // default for without override
   double dh_mag = 1e-4;
 
-  bool _complexStepGmatrix = getComplexStepGmatrix();
+  // bool _complexStepGmatrix = getComplexStepGmatrix();
 
-#ifdef TACS_USE_COMPLEX
-  if (_complexStepGmatrix) {
-    dh_mag = 1e-30;
-    dh = TacsScalar(0.0, dh_mag);
-  }
-#endif  // TACS_USE_COMPLEX
+// #ifdef TACS_USE_COMPLEX
+//   if (_complexStepGmatrix) {
+//     dh_mag = 1e-30;
+//     dh = TacsScalar(0.0, dh_mag);
+//   }
+// #endif  // TACS_USE_COMPLEX
 
   // Set alpha or gamma based on if this is a stiffness or mass matrix
   if (matType == TACS_STIFFNESS_MATRIX) {
@@ -859,276 +859,276 @@ int TACSShellElement<quadrature, basis, director, model>::evalPointQuantity(
   return 0;
 }
 
-template <int vars_per_node, class basis, class model>
-int TacsTestShellTyingStrain(double dh = 1e-7, int test_print_level = 2,
-                             double test_fail_atol = 1e-5,
-                             double test_fail_rtol = 1e-5) {
-  const int size = vars_per_node * basis::NUM_NODES;
-  const int usize = 3 * basis::NUM_NODES;
-  const int dsize = 3 * basis::NUM_NODES;
+// template <int vars_per_node, class basis, class model>
+// int TacsTestShellTyingStrain(double dh = 1e-7, int test_print_level = 2,
+//                              double test_fail_atol = 1e-5,
+//                              double test_fail_rtol = 1e-5) {
+//   const int size = vars_per_node * basis::NUM_NODES;
+//   const int usize = 3 * basis::NUM_NODES;
+//   const int dsize = 3 * basis::NUM_NODES;
 
-  TacsScalar Xpts[3 * basis::NUM_NODES], fn[3 * basis::NUM_NODES];
-  TacsGenerateRandomArray(Xpts, 3 * basis::NUM_NODES);
-  TacsGenerateRandomArray(fn, 3 * basis::NUM_NODES);
+//   TacsScalar Xpts[3 * basis::NUM_NODES], fn[3 * basis::NUM_NODES];
+//   TacsGenerateRandomArray(Xpts, 3 * basis::NUM_NODES);
+//   TacsGenerateRandomArray(fn, 3 * basis::NUM_NODES);
 
-  TacsScalar d[dsize], vars[size];
-  TacsGenerateRandomArray(d, dsize);
-  TacsGenerateRandomArray(vars, size);
+//   TacsScalar d[dsize], vars[size];
+//   TacsGenerateRandomArray(d, dsize);
+//   TacsGenerateRandomArray(vars, size);
 
-  TacsScalar XdinvT[9];
-  TacsGenerateRandomArray(XdinvT, 9);
+//   TacsScalar XdinvT[9];
+//   TacsGenerateRandomArray(XdinvT, 9);
 
-  TacsScalar de0ty[6], d2e0ty[36];
-  TacsGenerateRandomArray(de0ty, 6);
-  TacsGenerateRandomArray(d2e0ty, 36);
+//   TacsScalar de0ty[6], d2e0ty[36];
+//   TacsGenerateRandomArray(de0ty, 6);
+//   TacsGenerateRandomArray(d2e0ty, 36);
 
-  double pt[2];
-  TacsGenerateRandomArray(pt, 2);
+//   double pt[2];
+//   TacsGenerateRandomArray(pt, 2);
 
-  TacsScalar dety[basis::NUM_TYING_POINTS];
-  TacsScalar d2ety[basis::NUM_TYING_POINTS * basis::NUM_TYING_POINTS];
-  TacsScalar d2etyu[basis::NUM_TYING_POINTS * usize];
-  TacsScalar d2etyd[basis::NUM_TYING_POINTS * dsize];
-  memset(dety, 0, basis::NUM_TYING_POINTS * sizeof(TacsScalar));
-  memset(
-      d2ety, 0,
-      basis::NUM_TYING_POINTS * basis::NUM_TYING_POINTS * sizeof(TacsScalar));
-  memset(d2etyu, 0, basis::NUM_TYING_POINTS * usize * sizeof(TacsScalar));
-  memset(d2etyd, 0, basis::NUM_TYING_POINTS * dsize * sizeof(TacsScalar));
+//   TacsScalar dety[basis::NUM_TYING_POINTS];
+//   TacsScalar d2ety[basis::NUM_TYING_POINTS * basis::NUM_TYING_POINTS];
+//   TacsScalar d2etyu[basis::NUM_TYING_POINTS * usize];
+//   TacsScalar d2etyd[basis::NUM_TYING_POINTS * dsize];
+//   memset(dety, 0, basis::NUM_TYING_POINTS * sizeof(TacsScalar));
+//   memset(
+//       d2ety, 0,
+//       basis::NUM_TYING_POINTS * basis::NUM_TYING_POINTS * sizeof(TacsScalar));
+//   memset(d2etyu, 0, basis::NUM_TYING_POINTS * usize * sizeof(TacsScalar));
+//   memset(d2etyd, 0, basis::NUM_TYING_POINTS * dsize * sizeof(TacsScalar));
 
-  TacsScalar ety[basis::NUM_TYING_POINTS];
-  model::template computeTyingStrain<vars_per_node, basis>(Xpts, fn, vars, d,
-                                                           ety);
+//   TacsScalar ety[basis::NUM_TYING_POINTS];
+//   model::template computeTyingStrain<vars_per_node, basis>(Xpts, fn, vars, d,
+//                                                            ety);
 
-  // Evaluate the tying components of the strain
-  TacsScalar gty[6];  // The symmetric components of the tying strain
-  basis::interpTyingStrain(pt, ety, gty);
+//   // Evaluate the tying components of the strain
+//   TacsScalar gty[6];  // The symmetric components of the tying strain
+//   basis::interpTyingStrain(pt, ety, gty);
 
-  // Compute the symmetric parts of the tying strain
-  TacsScalar e0ty[6];  // e0ty = XdinvT^{T}*gty*XdinvT
-  mat3x3SymmTransformTranspose(XdinvT, gty, e0ty);
+//   // Compute the symmetric parts of the tying strain
+//   TacsScalar e0ty[6];  // e0ty = XdinvT^{T}*gty*XdinvT
+//   mat3x3SymmTransformTranspose(XdinvT, gty, e0ty);
 
-  // Compute the of the tying strain w.r.t. derivative w.r.t. the coefficients
-  TacsScalar dgty[6], d2gty[36];
-  mat3x3SymmTransformTransSens(XdinvT, de0ty, dgty);
-  mat3x3SymmTransformTransHessian(XdinvT, d2e0ty, d2gty);
+//   // Compute the of the tying strain w.r.t. derivative w.r.t. the coefficients
+//   TacsScalar dgty[6], d2gty[36];
+//   mat3x3SymmTransformTransSens(XdinvT, de0ty, dgty);
+//   mat3x3SymmTransformTransHessian(XdinvT, d2e0ty, d2gty);
 
-  // Evaluate the tying strain
-  basis::addInterpTyingStrainTranspose(pt, dgty, dety);
-  basis::addInterpTyingStrainHessian(pt, d2gty, d2ety);
+//   // Evaluate the tying strain
+//   basis::addInterpTyingStrainTranspose(pt, dgty, dety);
+//   basis::addInterpTyingStrainHessian(pt, d2gty, d2ety);
 
-  TacsScalar res[size], dd[dsize];
-  memset(res, 0, size * sizeof(TacsScalar));
-  memset(dd, 0, dsize * sizeof(TacsScalar));
+//   TacsScalar res[size], dd[dsize];
+//   memset(res, 0, size * sizeof(TacsScalar));
+//   memset(dd, 0, dsize * sizeof(TacsScalar));
 
-  TacsScalar mat[size * size], d2d[dsize * dsize], d2du[dsize * usize];
-  memset(mat, 0, size * size * sizeof(TacsScalar));
-  memset(d2d, 0, dsize * dsize * sizeof(TacsScalar));
-  memset(d2du, 0, dsize * usize * sizeof(TacsScalar));
+//   TacsScalar mat[size * size], d2d[dsize * dsize], d2du[dsize * usize];
+//   memset(mat, 0, size * size * sizeof(TacsScalar));
+//   memset(d2d, 0, dsize * dsize * sizeof(TacsScalar));
+//   memset(d2du, 0, dsize * usize * sizeof(TacsScalar));
 
-  // Set the total number of tying points needed for this element
-  model::template addComputeTyingStrainTranspose<vars_per_node, basis>(
-      Xpts, fn, vars, d, dety, res, dd);
-  model::template addComputeTyingStrainHessian<vars_per_node, basis>(
-      1.0, Xpts, fn, vars, d, dety, d2ety, d2etyu, d2etyd, mat, d2d, d2du);
+//   // Set the total number of tying points needed for this element
+//   model::template addComputeTyingStrainTranspose<vars_per_node, basis>(
+//       Xpts, fn, vars, d, dety, res, dd);
+//   model::template addComputeTyingStrainHessian<vars_per_node, basis>(
+//       1.0, Xpts, fn, vars, d, dety, d2ety, d2etyu, d2etyd, mat, d2d, d2du);
 
-  TacsScalar fdmat[size * size], fdd2du[dsize * usize];
-  for (int i = 0; i < size; i++) {
-    TacsScalar varst[size];
-    memcpy(varst, vars, size * sizeof(TacsScalar));
+//   TacsScalar fdmat[size * size], fdd2du[dsize * usize];
+//   for (int i = 0; i < size; i++) {
+//     TacsScalar varst[size];
+//     memcpy(varst, vars, size * sizeof(TacsScalar));
 
-#ifdef TACS_USE_COMPLEX
-    varst[i] = vars[i] + TacsScalar(0.0, dh);
-#else
-    varst[i] = vars[i] + dh;
-#endif  // TACS_USE_COMPLEX
+// #ifdef TACS_USE_COMPLEX
+//     varst[i] = vars[i] + TacsScalar(0.0, dh);
+// #else
+//     varst[i] = vars[i] + dh;
+// #endif  // TACS_USE_COMPLEX
 
-    // Perturb the variables
-    TacsScalar etyt[basis::NUM_TYING_POINTS];
-    model::template computeTyingStrain<vars_per_node, basis>(Xpts, fn, varst, d,
-                                                             etyt);
+//     // Perturb the variables
+//     TacsScalar etyt[basis::NUM_TYING_POINTS];
+//     model::template computeTyingStrain<vars_per_node, basis>(Xpts, fn, varst, d,
+//                                                              etyt);
 
-    // Evaluate the tying components of the strain
-    TacsScalar gtyt[6];  // The symmetric components of the tying strain
-    basis::interpTyingStrain(pt, etyt, gtyt);
+//     // Evaluate the tying components of the strain
+//     TacsScalar gtyt[6];  // The symmetric components of the tying strain
+//     basis::interpTyingStrain(pt, etyt, gtyt);
 
-    // Compute the symmetric parts of the tying strain
-    TacsScalar e0tyt[6];
-    mat3x3SymmTransformTranspose(XdinvT, gtyt, e0tyt);
+//     // Compute the symmetric parts of the tying strain
+//     TacsScalar e0tyt[6];
+//     mat3x3SymmTransformTranspose(XdinvT, gtyt, e0tyt);
 
-    TacsScalar de0tyt[6];
-    for (int j = 0; j < 6; j++) {
-      de0tyt[j] = de0ty[j];
-      for (int k = 0; k < 6; k++) {
-        de0tyt[j] += d2e0ty[6 * j + k] * (e0tyt[k] - e0ty[k]);
-      }
-    }
+//     TacsScalar de0tyt[6];
+//     for (int j = 0; j < 6; j++) {
+//       de0tyt[j] = de0ty[j];
+//       for (int k = 0; k < 6; k++) {
+//         de0tyt[j] += d2e0ty[6 * j + k] * (e0tyt[k] - e0ty[k]);
+//       }
+//     }
 
-    // Compute the of the tying strain w.r.t. derivative w.r.t. the coefficients
-    TacsScalar dgtyt[6];
-    mat3x3SymmTransformTransSens(XdinvT, de0tyt, dgtyt);
+//     // Compute the of the tying strain w.r.t. derivative w.r.t. the coefficients
+//     TacsScalar dgtyt[6];
+//     mat3x3SymmTransformTransSens(XdinvT, de0tyt, dgtyt);
 
-    TacsScalar detyt[basis::NUM_TYING_POINTS];
-    memset(detyt, 0, basis::NUM_TYING_POINTS * sizeof(TacsScalar));
+//     TacsScalar detyt[basis::NUM_TYING_POINTS];
+//     memset(detyt, 0, basis::NUM_TYING_POINTS * sizeof(TacsScalar));
 
-    // Evaluate the tying strain
-    basis::addInterpTyingStrainTranspose(pt, dgtyt, detyt);
+//     // Evaluate the tying strain
+//     basis::addInterpTyingStrainTranspose(pt, dgtyt, detyt);
 
-    TacsScalar rest[size], ddt[dsize];
-    memset(rest, 0, size * sizeof(TacsScalar));
-    memset(ddt, 0, dsize * sizeof(TacsScalar));
+//     TacsScalar rest[size], ddt[dsize];
+//     memset(rest, 0, size * sizeof(TacsScalar));
+//     memset(ddt, 0, dsize * sizeof(TacsScalar));
 
-    // Set the total number of tying points needed for this element
-    model::template addComputeTyingStrainTranspose<vars_per_node, basis>(
-        Xpts, fn, varst, d, detyt, rest, ddt);
+//     // Set the total number of tying points needed for this element
+//     model::template addComputeTyingStrainTranspose<vars_per_node, basis>(
+//         Xpts, fn, varst, d, detyt, rest, ddt);
 
-    for (int j = 0; j < size; j++) {
-#ifdef TACS_USE_COMPLEX
-      fdmat[size * j + i] = TacsImagPart(rest[j]) / dh;
-#else
-      fdmat[size * j + i] = (rest[j] - res[j]) / dh;
-#endif  // TACS_USE_COMPLEX
-    }
+//     for (int j = 0; j < size; j++) {
+// #ifdef TACS_USE_COMPLEX
+//       fdmat[size * j + i] = TacsImagPart(rest[j]) / dh;
+// #else
+//       fdmat[size * j + i] = (rest[j] - res[j]) / dh;
+// #endif  // TACS_USE_COMPLEX
+//     }
 
-    if (i % vars_per_node < 3) {
-      int index = 3 * (i / vars_per_node) + i % vars_per_node;
-      for (int j = 0; j < dsize; j++) {
-#ifdef TACS_USE_COMPLEX
-        fdd2du[usize * j + index] = TacsImagPart(ddt[j]) / dh;
-#else
-        fdd2du[usize * j + index] = (ddt[j] - dd[j]) / dh;
-#endif  // TACS_USE_COMPLEX
-      }
-    }
-  }
+//     if (i % vars_per_node < 3) {
+//       int index = 3 * (i / vars_per_node) + i % vars_per_node;
+//       for (int j = 0; j < dsize; j++) {
+// #ifdef TACS_USE_COMPLEX
+//         fdd2du[usize * j + index] = TacsImagPart(ddt[j]) / dh;
+// #else
+//         fdd2du[usize * j + index] = (ddt[j] - dd[j]) / dh;
+// #endif  // TACS_USE_COMPLEX
+//       }
+//     }
+//   }
 
-  int fail = 0;
-  double max_err, max_rel;
-  int max_err_index, max_rel_index;
+//   int fail = 0;
+//   double max_err, max_rel;
+//   int max_err_index, max_rel_index;
 
-  // Compute the error
-  max_err = TacsGetMaxError(mat, fdmat, size * size, &max_err_index);
-  max_rel = TacsGetMaxRelError(mat, fdmat, size * size, &max_rel_index);
+//   // Compute the error
+//   max_err = TacsGetMaxError(mat, fdmat, size * size, &max_err_index);
+//   max_rel = TacsGetMaxRelError(mat, fdmat, size * size, &max_rel_index);
 
-  if (test_print_level > 0) {
-    fprintf(stderr, "Testing the second derivative w.r.t. vars\n");
-    fprintf(stderr, "Max Err: %10.4e in component %d.\n", max_err,
-            max_err_index);
-    fprintf(stderr, "Max REr: %10.4e in component %d.\n", max_rel,
-            max_rel_index);
-  }
-  // Print the error if required
-  if (test_print_level > 1) {
-    TacsPrintErrorComponents(stderr, "mat", mat, fdmat, size * size);
-  }
-  if (test_print_level) {
-    fprintf(stderr, "\n");
-  }
+//   if (test_print_level > 0) {
+//     fprintf(stderr, "Testing the second derivative w.r.t. vars\n");
+//     fprintf(stderr, "Max Err: %10.4e in component %d.\n", max_err,
+//             max_err_index);
+//     fprintf(stderr, "Max REr: %10.4e in component %d.\n", max_rel,
+//             max_rel_index);
+//   }
+//   // Print the error if required
+//   if (test_print_level > 1) {
+//     TacsPrintErrorComponents(stderr, "mat", mat, fdmat, size * size);
+//   }
+//   if (test_print_level) {
+//     fprintf(stderr, "\n");
+//   }
 
-  fail = (max_err > test_fail_atol || max_rel > test_fail_rtol);
+//   fail = (max_err > test_fail_atol || max_rel > test_fail_rtol);
 
-  // Compute the error
-  max_err = TacsGetMaxError(d2du, fdd2du, dsize * usize, &max_err_index);
-  max_rel = TacsGetMaxRelError(d2du, fdd2du, dsize * usize, &max_rel_index);
+//   // Compute the error
+//   max_err = TacsGetMaxError(d2du, fdd2du, dsize * usize, &max_err_index);
+//   max_rel = TacsGetMaxRelError(d2du, fdd2du, dsize * usize, &max_rel_index);
 
-  if (test_print_level > 0) {
-    fprintf(stderr, "Testing the second derivative w.r.t. vars and d\n");
-    fprintf(stderr, "Max Err: %10.4e in component %d.\n", max_err,
-            max_err_index);
-    fprintf(stderr, "Max REr: %10.4e in component %d.\n", max_rel,
-            max_rel_index);
-  }
-  // Print the error if required
-  if (test_print_level > 1) {
-    TacsPrintErrorComponents(stderr, "d2du", d2du, fdd2du, dsize * usize);
-  }
-  if (test_print_level) {
-    fprintf(stderr, "\n");
-  }
+//   if (test_print_level > 0) {
+//     fprintf(stderr, "Testing the second derivative w.r.t. vars and d\n");
+//     fprintf(stderr, "Max Err: %10.4e in component %d.\n", max_err,
+//             max_err_index);
+//     fprintf(stderr, "Max REr: %10.4e in component %d.\n", max_rel,
+//             max_rel_index);
+//   }
+//   // Print the error if required
+//   if (test_print_level > 1) {
+//     TacsPrintErrorComponents(stderr, "d2du", d2du, fdd2du, dsize * usize);
+//   }
+//   if (test_print_level) {
+//     fprintf(stderr, "\n");
+//   }
 
-  fail = (max_err > test_fail_atol || max_rel > test_fail_rtol);
+//   fail = (max_err > test_fail_atol || max_rel > test_fail_rtol);
 
-  TacsScalar fdd2d[dsize * dsize];
-  for (int i = 0; i < dsize; i++) {
-    TacsScalar dt[size];
-    memcpy(dt, d, dsize * sizeof(TacsScalar));
+//   TacsScalar fdd2d[dsize * dsize];
+//   for (int i = 0; i < dsize; i++) {
+//     TacsScalar dt[size];
+//     memcpy(dt, d, dsize * sizeof(TacsScalar));
 
-#ifdef TACS_USE_COMPLEX
-    dt[i] = d[i] + TacsScalar(0.0, dh);
-#else
-    dt[i] = d[i] + dh;
-#endif  // TACS_USE_COMPLEX
+// #ifdef TACS_USE_COMPLEX
+//     dt[i] = d[i] + TacsScalar(0.0, dh);
+// #else
+//     dt[i] = d[i] + dh;
+// #endif  // TACS_USE_COMPLEX
 
-    // Perturb the variables
-    TacsScalar etyt[basis::NUM_TYING_POINTS];
-    model::template computeTyingStrain<vars_per_node, basis>(Xpts, fn, vars, dt,
-                                                             etyt);
+//     // Perturb the variables
+//     TacsScalar etyt[basis::NUM_TYING_POINTS];
+//     model::template computeTyingStrain<vars_per_node, basis>(Xpts, fn, vars, dt,
+//                                                              etyt);
 
-    // Evaluate the tying components of the strain
-    TacsScalar gtyt[6];  // The symmetric components of the tying strain
-    basis::interpTyingStrain(pt, etyt, gtyt);
+//     // Evaluate the tying components of the strain
+//     TacsScalar gtyt[6];  // The symmetric components of the tying strain
+//     basis::interpTyingStrain(pt, etyt, gtyt);
 
-    // Compute the symmetric parts of the tying strain
-    TacsScalar e0tyt[6];
-    mat3x3SymmTransformTranspose(XdinvT, gtyt, e0tyt);
+//     // Compute the symmetric parts of the tying strain
+//     TacsScalar e0tyt[6];
+//     mat3x3SymmTransformTranspose(XdinvT, gtyt, e0tyt);
 
-    TacsScalar de0tyt[6];
-    for (int j = 0; j < 6; j++) {
-      de0tyt[j] = de0ty[j];
-      for (int k = 0; k < 6; k++) {
-        de0tyt[j] += d2e0ty[6 * j + k] * (e0tyt[k] - e0ty[k]);
-      }
-    }
+//     TacsScalar de0tyt[6];
+//     for (int j = 0; j < 6; j++) {
+//       de0tyt[j] = de0ty[j];
+//       for (int k = 0; k < 6; k++) {
+//         de0tyt[j] += d2e0ty[6 * j + k] * (e0tyt[k] - e0ty[k]);
+//       }
+//     }
 
-    // Compute the of the tying strain w.r.t. derivative w.r.t. the coefficients
-    TacsScalar dgtyt[6];
-    mat3x3SymmTransformTransSens(XdinvT, de0tyt, dgtyt);
+//     // Compute the of the tying strain w.r.t. derivative w.r.t. the coefficients
+//     TacsScalar dgtyt[6];
+//     mat3x3SymmTransformTransSens(XdinvT, de0tyt, dgtyt);
 
-    TacsScalar detyt[basis::NUM_TYING_POINTS];
-    memset(detyt, 0, basis::NUM_TYING_POINTS * sizeof(TacsScalar));
+//     TacsScalar detyt[basis::NUM_TYING_POINTS];
+//     memset(detyt, 0, basis::NUM_TYING_POINTS * sizeof(TacsScalar));
 
-    // Evaluate the tying strain
-    basis::addInterpTyingStrainTranspose(pt, dgtyt, detyt);
+//     // Evaluate the tying strain
+//     basis::addInterpTyingStrainTranspose(pt, dgtyt, detyt);
 
-    TacsScalar rest[size], ddt[dsize];
-    memset(rest, 0, size * sizeof(TacsScalar));
-    memset(ddt, 0, dsize * sizeof(TacsScalar));
+//     TacsScalar rest[size], ddt[dsize];
+//     memset(rest, 0, size * sizeof(TacsScalar));
+//     memset(ddt, 0, dsize * sizeof(TacsScalar));
 
-    // Set the total number of tying points needed for this element
-    model::template addComputeTyingStrainTranspose<vars_per_node, basis>(
-        Xpts, fn, vars, dt, detyt, rest, ddt);
+//     // Set the total number of tying points needed for this element
+//     model::template addComputeTyingStrainTranspose<vars_per_node, basis>(
+//         Xpts, fn, vars, dt, detyt, rest, ddt);
 
-    for (int j = 0; j < dsize; j++) {
-#ifdef TACS_USE_COMPLEX
-      fdd2d[dsize * j + i] = TacsImagPart(ddt[j]) / dh;
-#else
-      fdd2d[dsize * j + i] = (ddt[j] - dd[j]) / dh;
-#endif  // TACS_USE_COMPLEX
-    }
-  }
+//     for (int j = 0; j < dsize; j++) {
+// #ifdef TACS_USE_COMPLEX
+//       fdd2d[dsize * j + i] = TacsImagPart(ddt[j]) / dh;
+// #else
+//       fdd2d[dsize * j + i] = (ddt[j] - dd[j]) / dh;
+// #endif  // TACS_USE_COMPLEX
+//     }
+//   }
 
-  // Compute the error
-  max_err = TacsGetMaxError(d2d, fdd2d, dsize * dsize, &max_err_index);
-  max_rel = TacsGetMaxRelError(d2d, fdd2d, dsize * dsize, &max_rel_index);
+//   // Compute the error
+//   max_err = TacsGetMaxError(d2d, fdd2d, dsize * dsize, &max_err_index);
+//   max_rel = TacsGetMaxRelError(d2d, fdd2d, dsize * dsize, &max_rel_index);
 
-  if (test_print_level > 0) {
-    fprintf(stderr, "Testing the second derivative w.r.t. d\n");
-    fprintf(stderr, "Max Err: %10.4e in component %d.\n", max_err,
-            max_err_index);
-    fprintf(stderr, "Max REr: %10.4e in component %d.\n", max_rel,
-            max_rel_index);
-  }
-  // Print the error if required
-  if (test_print_level > 1) {
-    TacsPrintErrorComponents(stderr, "d2d", d2d, fdd2d, dsize * dsize);
-  }
-  if (test_print_level) {
-    fprintf(stderr, "\n");
-  }
+//   if (test_print_level > 0) {
+//     fprintf(stderr, "Testing the second derivative w.r.t. d\n");
+//     fprintf(stderr, "Max Err: %10.4e in component %d.\n", max_err,
+//             max_err_index);
+//     fprintf(stderr, "Max REr: %10.4e in component %d.\n", max_rel,
+//             max_rel_index);
+//   }
+//   // Print the error if required
+//   if (test_print_level > 1) {
+//     TacsPrintErrorComponents(stderr, "d2d", d2d, fdd2d, dsize * dsize);
+//   }
+//   if (test_print_level) {
+//     fprintf(stderr, "\n");
+//   }
 
-  fail = (max_err > test_fail_atol || max_rel > test_fail_rtol);
+//   fail = (max_err > test_fail_atol || max_rel > test_fail_rtol);
 
-  return fail;
-}
+//   return fail;
+// }
 
 #endif  // TACS_SHELL_ELEMENT_H

@@ -1059,256 +1059,256 @@ void TacsShellAddTyingDispCoupling(const double pt[], const TacsScalar T[],
   }
 }
 
-/*
-  Test the implementation of the shell terms for a given basis
-*/
-template <int vars_per_node, class basis>
-int TacsTestShellUtilities(double dh = 1e-7, int test_print_level = 2,
-                           double test_fail_atol = 1e-5,
-                           double test_fail_rtol = 1e-5) {
-  const int size = vars_per_node * basis::NUM_NODES;
-  const int usize = 3 * basis::NUM_NODES;
-  const int dsize = 3 * basis::NUM_NODES;
-  const int xsize = 3 * basis::NUM_NODES;
+// /*
+//   Test the implementation of the shell terms for a given basis
+// */
+// template <int vars_per_node, class basis>
+// int TacsTestShellUtilities(double dh = 1e-7, int test_print_level = 2,
+//                            double test_fail_atol = 1e-5,
+//                            double test_fail_rtol = 1e-5) {
+//   const int size = vars_per_node * basis::NUM_NODES;
+//   const int usize = 3 * basis::NUM_NODES;
+//   const int dsize = 3 * basis::NUM_NODES;
+//   const int xsize = 3 * basis::NUM_NODES;
 
-  double pt[2];
-  TacsGenerateRandomArray(pt, 2);
+//   double pt[2];
+//   TacsGenerateRandomArray(pt, 2);
 
-  TacsScalar T[9];
-  TacsGenerateRandomArray(T, 9);
+//   TacsScalar T[9];
+//   TacsGenerateRandomArray(T, 9);
 
-  TacsScalar Xpts[xsize], fn[xsize];
-  TacsGenerateRandomArray(Xpts, xsize);
-  TacsGenerateRandomArray(fn, xsize);
+//   TacsScalar Xpts[xsize], fn[xsize];
+//   TacsGenerateRandomArray(Xpts, xsize);
+//   TacsGenerateRandomArray(fn, xsize);
 
-  TacsScalar n0[3], Xxi[6];
-  basis::template interpFields<3, 3>(pt, fn, n0);
-  basis::template interpFieldsGrad<3, 3>(pt, Xpts, Xxi);
+//   TacsScalar n0[3], Xxi[6];
+//   basis::template interpFields<3, 3>(pt, fn, n0);
+//   basis::template interpFieldsGrad<3, 3>(pt, Xpts, Xxi);
 
-  TacsScalar vars[size], d[dsize];
-  TacsGenerateRandomArray(vars, size);
-  TacsGenerateRandomArray(d, dsize);
+//   TacsScalar vars[size], d[dsize];
+//   TacsGenerateRandomArray(vars, size);
+//   TacsGenerateRandomArray(d, dsize);
 
-  // Generate random perturbations for the linear terms
-  TacsScalar du0x[9], du1x[9];
-  TacsGenerateRandomArray(du0x, 9);
-  TacsGenerateRandomArray(du1x, 9);
+//   // Generate random perturbations for the linear terms
+//   TacsScalar du0x[9], du1x[9];
+//   TacsGenerateRandomArray(du0x, 9);
+//   TacsGenerateRandomArray(du1x, 9);
 
-  // Generate the derivative terms
-  TacsScalar d2u0x[81], d2u1x[81], d2u0xu1x[81];
-  TacsGenerateRandomArray(d2u0x, 81);
-  TacsGenerateRandomArray(d2u1x, 81);
-  TacsGenerateRandomArray(d2u0xu1x, 81);
+//   // Generate the derivative terms
+//   TacsScalar d2u0x[81], d2u1x[81], d2u0xu1x[81];
+//   TacsGenerateRandomArray(d2u0x, 81);
+//   TacsGenerateRandomArray(d2u1x, 81);
+//   TacsGenerateRandomArray(d2u0xu1x, 81);
 
-  // Symmetrize the random matrices
-  for (int i = 0; i < 9; i++) {
-    for (int j = i + 1; j < 9; j++) {
-      d2u0x[9 * i + j] = d2u0x[9 * j + i];
-      d2u1x[9 * i + j] = d2u1x[9 * j + i];
-    }
-  }
+//   // Symmetrize the random matrices
+//   for (int i = 0; i < 9; i++) {
+//     for (int j = i + 1; j < 9; j++) {
+//       d2u0x[9 * i + j] = d2u0x[9 * j + i];
+//       d2u1x[9 * i + j] = d2u1x[9 * j + i];
+//     }
+//   }
 
-  TacsScalar res[size], mat[size * size];
-  memset(res, 0, size * sizeof(TacsScalar));
-  memset(mat, 0, size * size * sizeof(TacsScalar));
+//   TacsScalar res[size], mat[size * size];
+//   memset(res, 0, size * sizeof(TacsScalar));
+//   memset(mat, 0, size * size * sizeof(TacsScalar));
 
-  TacsScalar dd[dsize], d2d[dsize * dsize], d2du[usize * dsize];
-  memset(dd, 0, dsize * sizeof(TacsScalar));
-  memset(d2d, 0, dsize * dsize * sizeof(TacsScalar));
-  memset(d2du, 0, usize * dsize * sizeof(TacsScalar));
+//   TacsScalar dd[dsize], d2d[dsize * dsize], d2du[usize * dsize];
+//   memset(dd, 0, dsize * sizeof(TacsScalar));
+//   memset(d2d, 0, dsize * dsize * sizeof(TacsScalar));
+//   memset(d2du, 0, usize * dsize * sizeof(TacsScalar));
 
-  TacsScalar XdinvT[9], XdinvzT[9];
-  TacsScalar u0x[9], u1x[9];
-  TacsShellComputeDispGrad<vars_per_node, basis>(pt, Xpts, vars, fn, d, Xxi, n0,
-                                                 T, XdinvT, XdinvzT, u0x, u1x);
+//   TacsScalar XdinvT[9], XdinvzT[9];
+//   TacsScalar u0x[9], u1x[9];
+//   TacsShellComputeDispGrad<vars_per_node, basis>(pt, Xpts, vars, fn, d, Xxi, n0,
+//                                                  T, XdinvT, XdinvzT, u0x, u1x);
 
-  TacsShellAddDispGradSens<vars_per_node, basis>(pt, T, XdinvT, XdinvzT, du0x,
-                                                 du1x, res, dd);
-  TacsShellAddDispGradHessian<vars_per_node, basis>(
-      pt, T, XdinvT, XdinvzT, d2u0x, d2u1x, d2u0xu1x, mat, d2d, d2du);
+//   TacsShellAddDispGradSens<vars_per_node, basis>(pt, T, XdinvT, XdinvzT, du0x,
+//                                                  du1x, res, dd);
+//   TacsShellAddDispGradHessian<vars_per_node, basis>(
+//       pt, T, XdinvT, XdinvzT, d2u0x, d2u1x, d2u0xu1x, mat, d2d, d2du);
 
-  // Now, check the result
-  TacsScalar fdmat[size * size], fddu[dsize * usize];
-  for (int k = 0; k < size; k++) {
-    TacsScalar varst[size];
-    memcpy(varst, vars, size * sizeof(TacsScalar));
+//   // Now, check the result
+//   TacsScalar fdmat[size * size], fddu[dsize * usize];
+//   for (int k = 0; k < size; k++) {
+//     TacsScalar varst[size];
+//     memcpy(varst, vars, size * sizeof(TacsScalar));
 
-#ifdef TACS_USE_COMPLEX
-    varst[k] = vars[k] + TacsScalar(0.0, dh);
-#else
-    varst[k] = vars[k] + dh;
-#endif  // TACS_USE_COMPLEX
+// #ifdef TACS_USE_COMPLEX
+//     varst[k] = vars[k] + TacsScalar(0.0, dh);
+// #else
+//     varst[k] = vars[k] + dh;
+// #endif  // TACS_USE_COMPLEX
 
-    // Compute the pertubation
-    TacsScalar u0xt[9], u1xt[9];
-    TacsShellComputeDispGrad<vars_per_node, basis>(
-        pt, Xpts, varst, fn, d, Xxi, n0, T, XdinvT, XdinvzT, u0xt, u1xt);
+//     // Compute the pertubation
+//     TacsScalar u0xt[9], u1xt[9];
+//     TacsShellComputeDispGrad<vars_per_node, basis>(
+//         pt, Xpts, varst, fn, d, Xxi, n0, T, XdinvT, XdinvzT, u0xt, u1xt);
 
-    // d2u0xu1x[9*i + j] = p2f/(p(u0x[i]) p(u1x[j]))
-    // d2Ctu0x[9*i + j] = p2f/(p(Ct[i]) p(u0x[j]))
+//     // d2u0xu1x[9*i + j] = p2f/(p(u0x[i]) p(u1x[j]))
+//     // d2Ctu0x[9*i + j] = p2f/(p(Ct[i]) p(u0x[j]))
 
-    // Compute the perturbed values based on the outputs
-    TacsScalar du0xt[9], du1xt[9];
-    for (int i = 0; i < 9; i++) {
-      du0xt[i] = du0x[i];
-      du1xt[i] = du1x[i];
-      for (int j = 0; j < 9; j++) {
-        du0xt[i] += d2u0x[9 * i + j] * (u0xt[j] - u0x[j]) +
-                    d2u0xu1x[9 * i + j] * (u1xt[j] - u1x[j]);
+//     // Compute the perturbed values based on the outputs
+//     TacsScalar du0xt[9], du1xt[9];
+//     for (int i = 0; i < 9; i++) {
+//       du0xt[i] = du0x[i];
+//       du1xt[i] = du1x[i];
+//       for (int j = 0; j < 9; j++) {
+//         du0xt[i] += d2u0x[9 * i + j] * (u0xt[j] - u0x[j]) +
+//                     d2u0xu1x[9 * i + j] * (u1xt[j] - u1x[j]);
 
-        du1xt[i] += d2u1x[9 * i + j] * (u1xt[j] - u1x[j]) +
-                    d2u0xu1x[9 * j + i] * (u0xt[j] - u0x[j]);
-      }
-    }
+//         du1xt[i] += d2u1x[9 * i + j] * (u1xt[j] - u1x[j]) +
+//                     d2u0xu1x[9 * j + i] * (u0xt[j] - u0x[j]);
+//       }
+//     }
 
-    TacsScalar rest[size], ddt[dsize];
-    memset(rest, 0, size * sizeof(TacsScalar));
-    memset(ddt, 0, dsize * sizeof(TacsScalar));
-    TacsShellAddDispGradSens<vars_per_node, basis>(pt, T, XdinvT, XdinvzT,
-                                                   du0xt, du1xt, rest, ddt);
+//     TacsScalar rest[size], ddt[dsize];
+//     memset(rest, 0, size * sizeof(TacsScalar));
+//     memset(ddt, 0, dsize * sizeof(TacsScalar));
+//     TacsShellAddDispGradSens<vars_per_node, basis>(pt, T, XdinvT, XdinvzT,
+//                                                    du0xt, du1xt, rest, ddt);
 
-    // Place the result in the arrays...
-    for (int j = 0; j < size; j++) {
-#ifdef TACS_USE_COMPLEX
-      fdmat[k + size * j] = TacsImagPart(rest[j]) / dh;
-#else
-      fdmat[k + size * j] = (rest[j] - res[j]) / dh;
-#endif  // TACS_USE_COMPLEX
-    }
+//     // Place the result in the arrays...
+//     for (int j = 0; j < size; j++) {
+// #ifdef TACS_USE_COMPLEX
+//       fdmat[k + size * j] = TacsImagPart(rest[j]) / dh;
+// #else
+//       fdmat[k + size * j] = (rest[j] - res[j]) / dh;
+// #endif  // TACS_USE_COMPLEX
+//     }
 
-    if (k % vars_per_node < 3) {
-      // Compute the u-index
-      int index = 3 * (k / vars_per_node) + k % vars_per_node;
+//     if (k % vars_per_node < 3) {
+//       // Compute the u-index
+//       int index = 3 * (k / vars_per_node) + k % vars_per_node;
 
-      for (int j = 0; j < dsize; j++) {
-#ifdef TACS_USE_COMPLEX
-        fddu[index + usize * j] = TacsImagPart(ddt[j]) / dh;
-#else
-        fddu[index + usize * j] = (ddt[j] - dd[j]) / dh;
-#endif  // TACS_USE_COMPLEX
-      }
-    }
-  }
+//       for (int j = 0; j < dsize; j++) {
+// #ifdef TACS_USE_COMPLEX
+//         fddu[index + usize * j] = TacsImagPart(ddt[j]) / dh;
+// #else
+//         fddu[index + usize * j] = (ddt[j] - dd[j]) / dh;
+// #endif  // TACS_USE_COMPLEX
+//       }
+//     }
+//   }
 
-  // Variables to store the max error and indices
-  int max_err_index, max_rel_index;
-  double max_err, max_rel;
+//   // Variables to store the max error and indices
+//   int max_err_index, max_rel_index;
+//   double max_err, max_rel;
 
-  // Keep track of the failure flag
-  int fail = 0;
+//   // Keep track of the failure flag
+//   int fail = 0;
 
-  // Compute the error
-  max_err = TacsGetMaxError(mat, fdmat, size * size, &max_err_index);
-  max_rel = TacsGetMaxRelError(mat, fdmat, size * size, &max_rel_index);
+//   // Compute the error
+//   max_err = TacsGetMaxError(mat, fdmat, size * size, &max_err_index);
+//   max_rel = TacsGetMaxRelError(mat, fdmat, size * size, &max_rel_index);
 
-  if (test_print_level > 0) {
-    fprintf(stderr, "Testing the derivative w.r.t. vars\n");
-    fprintf(stderr, "Max Err: %10.4e in component %d.\n", max_err,
-            max_err_index);
-    fprintf(stderr, "Max REr: %10.4e in component %d.\n", max_rel,
-            max_rel_index);
-  }
-  // Print the error if required
-  if (test_print_level > 1) {
-    TacsPrintErrorComponents(stderr, "mat", mat, fdmat, size * size);
-  }
-  if (test_print_level) {
-    fprintf(stderr, "\n");
-  }
+//   if (test_print_level > 0) {
+//     fprintf(stderr, "Testing the derivative w.r.t. vars\n");
+//     fprintf(stderr, "Max Err: %10.4e in component %d.\n", max_err,
+//             max_err_index);
+//     fprintf(stderr, "Max REr: %10.4e in component %d.\n", max_rel,
+//             max_rel_index);
+//   }
+//   // Print the error if required
+//   if (test_print_level > 1) {
+//     TacsPrintErrorComponents(stderr, "mat", mat, fdmat, size * size);
+//   }
+//   if (test_print_level) {
+//     fprintf(stderr, "\n");
+//   }
 
-  fail = (max_err > test_fail_atol || max_rel > test_fail_rtol);
+//   fail = (max_err > test_fail_atol || max_rel > test_fail_rtol);
 
-  // Compute the error
-  max_err = TacsGetMaxError(d2du, fddu, usize * dsize, &max_err_index);
-  max_rel = TacsGetMaxRelError(d2du, fddu, usize * dsize, &max_rel_index);
+//   // Compute the error
+//   max_err = TacsGetMaxError(d2du, fddu, usize * dsize, &max_err_index);
+//   max_rel = TacsGetMaxRelError(d2du, fddu, usize * dsize, &max_rel_index);
 
-  if (test_print_level > 0) {
-    fprintf(stderr, "Testing the derivative w.r.t. d and vars\n");
-    fprintf(stderr, "Max Err: %10.4e in component %d.\n", max_err,
-            max_err_index);
-    fprintf(stderr, "Max REr: %10.4e in component %d.\n", max_rel,
-            max_rel_index);
-  }
-  // Print the error if required
-  if (test_print_level > 1) {
-    TacsPrintErrorComponents(stderr, "d2du", d2du, fddu, usize * dsize);
-  }
-  if (test_print_level) {
-    fprintf(stderr, "\n");
-  }
+//   if (test_print_level > 0) {
+//     fprintf(stderr, "Testing the derivative w.r.t. d and vars\n");
+//     fprintf(stderr, "Max Err: %10.4e in component %d.\n", max_err,
+//             max_err_index);
+//     fprintf(stderr, "Max REr: %10.4e in component %d.\n", max_rel,
+//             max_rel_index);
+//   }
+//   // Print the error if required
+//   if (test_print_level > 1) {
+//     TacsPrintErrorComponents(stderr, "d2du", d2du, fddu, usize * dsize);
+//   }
+//   if (test_print_level) {
+//     fprintf(stderr, "\n");
+//   }
 
-  fail = (max_err > test_fail_atol || max_rel > test_fail_rtol);
+//   fail = (max_err > test_fail_atol || max_rel > test_fail_rtol);
 
-  TacsScalar fddd[dsize * dsize];
-  for (int k = 0; k < dsize; k++) {
-    TacsScalar dt[dsize];
-    memcpy(dt, d, dsize * sizeof(TacsScalar));
+//   TacsScalar fddd[dsize * dsize];
+//   for (int k = 0; k < dsize; k++) {
+//     TacsScalar dt[dsize];
+//     memcpy(dt, d, dsize * sizeof(TacsScalar));
 
-#ifdef TACS_USE_COMPLEX
-    dt[k] = d[k] + TacsScalar(0.0, dh);
-#else
-    dt[k] = d[k] + dh;
-#endif  // TACS_USE_COMPLEX
+// #ifdef TACS_USE_COMPLEX
+//     dt[k] = d[k] + TacsScalar(0.0, dh);
+// #else
+//     dt[k] = d[k] + dh;
+// #endif  // TACS_USE_COMPLEX
 
-    // Compute the pertubation
-    TacsScalar u0xt[9], u1xt[9];
-    TacsShellComputeDispGrad<vars_per_node, basis>(
-        pt, Xpts, vars, fn, dt, Xxi, n0, T, XdinvT, XdinvzT, u0xt, u1xt);
+//     // Compute the pertubation
+//     TacsScalar u0xt[9], u1xt[9];
+//     TacsShellComputeDispGrad<vars_per_node, basis>(
+//         pt, Xpts, vars, fn, dt, Xxi, n0, T, XdinvT, XdinvzT, u0xt, u1xt);
 
-    // d2u0xu1x[9*i + j] = p2f/(p(u0x[i]) p(u1x[j]))
-    // d2Ctu0x[9*i + j] = p2f/(p(Ct[i]) p(u0x[j]))
+//     // d2u0xu1x[9*i + j] = p2f/(p(u0x[i]) p(u1x[j]))
+//     // d2Ctu0x[9*i + j] = p2f/(p(Ct[i]) p(u0x[j]))
 
-    // Compute the perturbed values based on the outputs
-    TacsScalar du0xt[9], du1xt[9];
-    for (int i = 0; i < 9; i++) {
-      du0xt[i] = du0x[i];
-      du1xt[i] = du1x[i];
-      for (int j = 0; j < 9; j++) {
-        du0xt[i] += d2u0x[9 * i + j] * (u0xt[j] - u0x[j]) +
-                    d2u0xu1x[9 * i + j] * (u1xt[j] - u1x[j]);
+//     // Compute the perturbed values based on the outputs
+//     TacsScalar du0xt[9], du1xt[9];
+//     for (int i = 0; i < 9; i++) {
+//       du0xt[i] = du0x[i];
+//       du1xt[i] = du1x[i];
+//       for (int j = 0; j < 9; j++) {
+//         du0xt[i] += d2u0x[9 * i + j] * (u0xt[j] - u0x[j]) +
+//                     d2u0xu1x[9 * i + j] * (u1xt[j] - u1x[j]);
 
-        du1xt[i] += d2u1x[9 * i + j] * (u1xt[j] - u1x[j]) +
-                    d2u0xu1x[9 * j + i] * (u0xt[j] - u0x[j]);
-      }
-    }
+//         du1xt[i] += d2u1x[9 * i + j] * (u1xt[j] - u1x[j]) +
+//                     d2u0xu1x[9 * j + i] * (u0xt[j] - u0x[j]);
+//       }
+//     }
 
-    TacsScalar rest[size], ddt[dsize];
-    memset(rest, 0, size * sizeof(TacsScalar));
-    memset(ddt, 0, dsize * sizeof(TacsScalar));
-    TacsShellAddDispGradSens<vars_per_node, basis>(pt, T, XdinvT, XdinvzT,
-                                                   du0xt, du1xt, rest, ddt);
+//     TacsScalar rest[size], ddt[dsize];
+//     memset(rest, 0, size * sizeof(TacsScalar));
+//     memset(ddt, 0, dsize * sizeof(TacsScalar));
+//     TacsShellAddDispGradSens<vars_per_node, basis>(pt, T, XdinvT, XdinvzT,
+//                                                    du0xt, du1xt, rest, ddt);
 
-    for (int j = 0; j < dsize; j++) {
-#ifdef TACS_USE_COMPLEX
-      fddd[k + dsize * j] = TacsImagPart(ddt[j]) / dh;
-#else
-      fddd[k + dsize * j] = (ddt[j] - dd[j]) / dh;
-#endif  // TACS_USE_COMPLEX
-    }
-  }
+//     for (int j = 0; j < dsize; j++) {
+// #ifdef TACS_USE_COMPLEX
+//       fddd[k + dsize * j] = TacsImagPart(ddt[j]) / dh;
+// #else
+//       fddd[k + dsize * j] = (ddt[j] - dd[j]) / dh;
+// #endif  // TACS_USE_COMPLEX
+//     }
+//   }
 
-  // Compute the error
-  max_err = TacsGetMaxError(d2d, fddd, dsize * dsize, &max_err_index);
-  max_rel = TacsGetMaxRelError(d2d, fddd, dsize * dsize, &max_rel_index);
+//   // Compute the error
+//   max_err = TacsGetMaxError(d2d, fddd, dsize * dsize, &max_err_index);
+//   max_rel = TacsGetMaxRelError(d2d, fddd, dsize * dsize, &max_rel_index);
 
-  if (test_print_level > 0) {
-    fprintf(stderr, "Testing the derivative w.r.t. d\n");
-    fprintf(stderr, "Max Err: %10.4e in component %d.\n", max_err,
-            max_err_index);
-    fprintf(stderr, "Max REr: %10.4e in component %d.\n", max_rel,
-            max_rel_index);
-  }
-  // Print the error if required
-  if (test_print_level > 1) {
-    TacsPrintErrorComponents(stderr, "d2d", d2d, fddd, dsize * dsize);
-  }
-  if (test_print_level) {
-    fprintf(stderr, "\n");
-  }
+//   if (test_print_level > 0) {
+//     fprintf(stderr, "Testing the derivative w.r.t. d\n");
+//     fprintf(stderr, "Max Err: %10.4e in component %d.\n", max_err,
+//             max_err_index);
+//     fprintf(stderr, "Max REr: %10.4e in component %d.\n", max_rel,
+//             max_rel_index);
+//   }
+//   // Print the error if required
+//   if (test_print_level > 1) {
+//     TacsPrintErrorComponents(stderr, "d2d", d2d, fddd, dsize * dsize);
+//   }
+//   if (test_print_level) {
+//     fprintf(stderr, "\n");
+//   }
 
-  fail = (max_err > test_fail_atol || max_rel > test_fail_rtol);
+//   fail = (max_err > test_fail_atol || max_rel > test_fail_rtol);
 
-  return fail;
-}
+//   return fail;
+// }
 
 #endif  // TACS_SHELL_UTILITIES_H

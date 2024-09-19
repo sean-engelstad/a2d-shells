@@ -5,7 +5,7 @@
 # ============================================
 
 include Makefile.in
-include TACS_Common.mk
+include A2D_SHELLS.mk
 
 TACS_SUBDIRS = src \
 	src/bpmat \

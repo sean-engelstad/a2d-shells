@@ -15,6 +15,7 @@
 #ifndef TACS_ELEMENT_BASIS_H
 #define TACS_ELEMENT_BASIS_H
 
+#include "TACSElementTypes.h"
 #include "TACSObject.h"
 
 /*
@@ -28,6 +29,24 @@
 
 class TACSElementBasis : public TACSObject {
  public:
+  /**
+    Get the layout type
+
+    @return The element layout type
+  */
+  virtual ElementLayout getLayoutType();
+
+  /**
+    Get the parametric point visualization point
+
+    Note that the number of visualization points must be consistent with
+    the number of points defined by the call to TacsGetNumVisNodes()
+    with the corresponding element layout type.
+
+    @param n Index for the parametric point for visualization
+    @param pt Parametric point location within the element
+  */
+  virtual void getVisPoint(int n, double pt[]);
 
   /**
     Get the number of basis functions
@@ -119,6 +138,25 @@ class TACSElementBasis : public TACSObject {
                            TacsScalar normal[]);
 
   /**
+    Add the derivative of the face normal into the nodal sensitivities
+
+    @param face The face/edge index
+    @param n The quadrautre point index
+    @param Xpts The node locations
+    @param A The area contribution (computed from forward code)
+    @param normal The face normal
+    @param dfdA The input derivative of the function w.r.t. area
+    @param dfdXd The derivative of the function w.r.t. Xd
+    @param dfdn The derivative of the function w.r.t. surface normal
+    @param dfdXpts The output derivative w.r.t. the node locations
+  */
+  void addFaceNormalXptSens(int face, int n, const TacsScalar A,
+                            const TacsScalar Xd[], const TacsScalar normal[],
+                            const TacsScalar dfdA, const TacsScalar dfdX[],
+                            const TacsScalar dfdXd[], const TacsScalar dfdn[],
+                            TacsScalar dfdXpts[]);
+
+  /**
     Get the Jacobian transformation from computational to physical
     coordinates.
 
@@ -207,6 +245,63 @@ class TACSElementBasis : public TACSObject {
                               TacsScalar Ud[], TacsScalar Ux[]);
 
   /**
+    Add the derivative of the field gradient terms with respect to
+    the state variable values.
+
+    @param n The index of the quadrature point
+    @param pt The parametric location
+    @param Xpts The element node locations
+    @param vars_per_node The number of degrees of freedom per node
+    @param Xd The derivative of the physical node location w.r.t. parameters
+    @param J The Jacobian transformation (inverse of Xd)
+    @param Ud The derivative of the variables w.r.t. the parametric coords
+    @param dfdUt The derivative of the function w.r.t. Ut
+    @param dfdUx The derivative of the function w.r.t. Ux
+    @param dfdu The output derivative of the function w.r.t. state variables
+  */
+  void addFieldGradientSVSens(int n, const double pt[], const TacsScalar Xpts[],
+                              const int vars_per_node, const TacsScalar Xd[],
+                              const TacsScalar J[], const TacsScalar Ud[],
+                              const TacsScalar dfdUt[], TacsScalar dfdUx[],
+                              TacsScalar dfdu[]);
+
+  /**
+    Add the contributions to the derivative of the node locations from
+    the computation of the field gradient.
+
+    This member function adds the contribution to the gradient from derivatives
+    of a function with respect to the determinant, the node location, the
+    derivatives of the nodes with respect to the parametric coordinates, and
+    the terms in the Jacobian transformation, and the derivatives of the
+    field quantities.
+
+    The terms dfdX, dfdXd, dfdJ and dfdUx may be passed in as NULL if they
+    are zero.
+
+    @param n The index of the quadrature point
+    @param pt The parametric location
+    @param Xpts The element node locations
+    @param vars_per_node The number of degrees of freedom per node
+    @param Xd The derivative of the physical node location w.r.t. parameters
+    @param J The Jacobian transformation (inverse of Xd)
+    @param Ud The derivative of the variables w.r.t. the parametric coords
+    @param dfddetJ The derivative of the determinant
+    @param dfdX The derivative w.r.t. node location
+    @param dfdXd The derivative w.r.t. the components of Xd
+    @param dfdJ The derivative w.r.t. the components of J
+    @param dfdUx The derivative w.r.t. the components of Ux
+    @param dfdXpts The output derivative of the function w.r.t. node locations
+  */
+  void addFieldGradientXptSens(int n, const double pt[],
+                               const TacsScalar Xpts[], const int vars_per_node,
+                               const TacsScalar Xd[], const TacsScalar J[],
+                               const TacsScalar Ud[], const TacsScalar dfddetJ,
+                               const TacsScalar dfdX[],
+                               const TacsScalar dfdXd[],
+                               const TacsScalar dfdJ[],
+                               const TacsScalar dfdUx[], TacsScalar dfdXpts[]);
+
+  /**
     Get the gradient of the field at the quadrature point.
 
     This function returns the values and derivatives of the state variables,
@@ -243,6 +338,38 @@ class TACSElementBasis : public TACSObject {
                               TacsScalar Ut[], TacsScalar Ud[], TacsScalar Ux[],
                               TacsScalar Psi[], TacsScalar Psid[],
                               TacsScalar Psix[]);
+
+  /**
+    Add the contributions to the derivative of the node locations from
+    the computation of the field and adjoint gradients.
+
+    The terms dfdX, dfdXd, dfdJ, dfdPsix or dfdUx may be passed in as NULL if
+    they are zero. Note that if either dfdPsix or dfdUx is NULL, then the other
+    must be as well. (If not you should use the other version of this code.)
+
+    @param n The index of the quadrature point
+    @param pt The parametric location
+    @param Xpts The element node locations
+    @param vars_per_node The number of degrees of freedom per node
+    @param Xd The derivative of the physical node location w.r.t. parameters
+    @param J The Jacobian transformation (inverse of Xd)
+    @param Ud The derivative of the variables w.r.t. the parametric coords
+    @param Psid The derivatives of the adjoint variables w.r.t. parameters
+    @param dfddetJ The derivative of the determinant
+    @param dfdX The derivative w.r.t. node location
+    @param dfdXd The derivative w.r.t. the components of Xd
+    @param dfdJ The derivative w.r.t. the components of J
+    @param dfdUx The derivative w.r.t. the components of Ux
+    @param dfdPsix The derivative w.r.t. the components of Psix
+    @param dfdXpts The output derivative of the function w.r.t. node locations
+  */
+  void addFieldGradientXptSens(
+      int n, const double pt[], const TacsScalar Xpts[],
+      const int vars_per_node, const TacsScalar Xd[], const TacsScalar J[],
+      const TacsScalar Ud[], const TacsScalar Psid[], const TacsScalar dfddetJ,
+      const TacsScalar dfdX[], const TacsScalar dfdXd[],
+      const TacsScalar dfdJ[], const TacsScalar dfdUx[],
+      const TacsScalar dfdPsix[], TacsScalar dfdXpts[]);
 
   /**
     Add the weak form of the governing equations to the residual.

@@ -39,56 +39,56 @@ void TacsZeroNumFlops() { tacs_local_flop_count = 0.0; }
 /*
   These definite the min/max operations for complex values
 */
-// #ifdef TACS_USE_COMPLEX
-// void TacsMPIComplexMax(void *_in, void *_out, int *count, MPI_Datatype *data) {
-//   if (*data == MPI_DOUBLE_COMPLEX) {
-//     TacsScalar *in = (TacsScalar *)_in;
-//     TacsScalar *out = (TacsScalar *)_out;
+#ifdef TACS_USE_COMPLEX
+void TacsMPIComplexMax(void *_in, void *_out, int *count, MPI_Datatype *data) {
+  if (*data == MPI_DOUBLE_COMPLEX) {
+    TacsScalar *in = (TacsScalar *)_in;
+    TacsScalar *out = (TacsScalar *)_out;
 
-//     // Compare the real parts of the array
-//     for (int i = 0; i < *count; i++) {
-//       if (TacsRealPart(in[i]) >= TacsRealPart(out[i])) {
-//         out[i] = in[i];
-//       }
-//     }
-//   }
-// }
+    // Compare the real parts of the array
+    for (int i = 0; i < *count; i++) {
+      if (TacsRealPart(in[i]) >= TacsRealPart(out[i])) {
+        out[i] = in[i];
+      }
+    }
+  }
+}
 
-// void TacsMPIComplexMin(void *_in, void *_out, int *count, MPI_Datatype *data) {
-//   if (*data == MPI_DOUBLE_COMPLEX) {
-//     TacsScalar *in = (TacsScalar *)_in;
-//     TacsScalar *out = (TacsScalar *)_out;
+void TacsMPIComplexMin(void *_in, void *_out, int *count, MPI_Datatype *data) {
+  if (*data == MPI_DOUBLE_COMPLEX) {
+    TacsScalar *in = (TacsScalar *)_in;
+    TacsScalar *out = (TacsScalar *)_out;
 
-//     // Compare the real parts of the array
-//     for (int i = 0; i < *count; i++) {
-//       if (TacsRealPart(in[i]) < TacsRealPart(out[i])) {
-//         out[i] = in[i];
-//       }
-//     }
-//   }
-// }
-// #endif
+    // Compare the real parts of the array
+    for (int i = 0; i < *count; i++) {
+      if (TacsRealPart(in[i]) < TacsRealPart(out[i])) {
+        out[i] = in[i];
+      }
+    }
+  }
+}
+#endif
 
-// // Static flag to test if TacsInitialize has been called
+// Static flag to test if TacsInitialize has been called
 static int TacsInitialized = 0;
 
-// MPI_Op TACS_MPI_MIN = MPI_MAX;
-// MPI_Op TACS_MPI_MAX = MPI_MIN;
+MPI_Op TACS_MPI_MIN = MPI_MAX;
+MPI_Op TACS_MPI_MAX = MPI_MIN;
 
-// void TacsInitialize() {
-//   if (!TacsInitialized) {
-// #ifdef TACS_USE_COMPLEX
-//     // Try to add the MPI reduction operator for MPI_DOUBLE_COMPLEX
-//     int commute = 1;
-//     MPI_Op_create(TacsMPIComplexMax, commute, &TACS_MPI_MAX);
-//     MPI_Op_create(TacsMPIComplexMin, commute, &TACS_MPI_MIN);
-// #else
-//     TACS_MPI_MAX = MPI_MAX;
-//     TACS_MPI_MIN = MPI_MIN;
-// #endif
-//   }
-//   TacsInitialized++;
-// }
+void TacsInitialize() {
+  if (!TacsInitialized) {
+#ifdef TACS_USE_COMPLEX
+    // Try to add the MPI reduction operator for MPI_DOUBLE_COMPLEX
+    int commute = 1;
+    MPI_Op_create(TacsMPIComplexMax, commute, &TACS_MPI_MAX);
+    MPI_Op_create(TacsMPIComplexMin, commute, &TACS_MPI_MIN);
+#else
+    TACS_MPI_MAX = MPI_MAX;
+    TACS_MPI_MIN = MPI_MIN;
+#endif
+  }
+  TacsInitialized++;
+}
 
 int TacsIsInitialized() { return TacsInitialized; }
 

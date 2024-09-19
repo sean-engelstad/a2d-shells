@@ -35,13 +35,35 @@ class TACSIsoShellConstitutive : public TACSShellConstitutive {
                            TacsScalar _tub = 1.0, TacsScalar _tOffset = 0.0);
   ~TACSIsoShellConstitutive();
 
+  // Retrieve the global design variable numbers
+  int getDesignVarNums(int elemIndex, int dvLen, int dvNums[]);
+
+  // Set the element design variable from the design vector
+  int setDesignVars(int elemIndex, int dvLen, const TacsScalar dvs[]);
+
+  // Get the element design variables values
+  int getDesignVars(int elemIndex, int dvLen, TacsScalar dvs[]);
+
+  // Get the lower and upper bounds for the design variable values
+  int getDesignVarRange(int elemIndex, int dvLen, TacsScalar lb[],
+                        TacsScalar ub[]);
+
   // Evaluate the material density
   TacsScalar evalDensity(int elemIndex, const double pt[],
                          const TacsScalar X[]);
 
+  // Add the derivative of the density
+  void addDensityDVSens(int elemIndex, TacsScalar scale, const double pt[],
+                        const TacsScalar X[], int dvLen, TacsScalar dfdx[]);
+
   // Evaluate the mass moments
   void evalMassMoments(int elemIndex, const double pt[], const TacsScalar X[],
                        TacsScalar moments[]);
+
+  // Add the sensitivity of the mass moments
+  void addMassMomentsDVSens(int elemIndex, const double pt[],
+                            const TacsScalar X[], const TacsScalar scale[],
+                            int dvLen, TacsScalar dfdx[]);
 
   // Evaluate the specific heat
   TacsScalar evalSpecificHeat(int elemIndex, const double pt[],
@@ -55,6 +77,11 @@ class TACSIsoShellConstitutive : public TACSShellConstitutive {
   void evalTangentStiffness(int elemIndex, const double pt[],
                             const TacsScalar X[], TacsScalar C[]);
 
+  // Add the contribution
+  void addStressDVSens(int elemIndex, TacsScalar scale, const double pt[],
+                       const TacsScalar X[], const TacsScalar strain[],
+                       const TacsScalar psi[], int dvLen, TacsScalar dfdx[]);
+
   // Calculate the point-wise failure criteria
   TacsScalar evalFailure(int elemIndex, const double pt[], const TacsScalar X[],
                          const TacsScalar e[]);
@@ -63,6 +90,11 @@ class TACSIsoShellConstitutive : public TACSShellConstitutive {
   TacsScalar evalFailureStrainSens(int elemIndex, const double pt[],
                                    const TacsScalar X[], const TacsScalar e[],
                                    TacsScalar sens[]);
+
+  // Add the derivative of the failure criteria w.r.t. the design variables
+  void addFailureDVSens(int elemIndex, TacsScalar scale, const double pt[],
+                        const TacsScalar X[], const TacsScalar strain[],
+                        int dvLen, TacsScalar dfdx[]);
 
   // Evaluate the thermal strain
   void evalThermalStrain(int elemIndex, const double pt[], const TacsScalar X[],
@@ -75,6 +107,11 @@ class TACSIsoShellConstitutive : public TACSShellConstitutive {
   // Evaluate the tangent of the heat flux
   void evalTangentHeatFlux(int elemIndex, const double pt[],
                            const TacsScalar X[], TacsScalar C[]);
+
+  // Add the derivative of the heat flux
+  void addHeatFluxDVSens(int elemIndex, TacsScalar scale, const double pt[],
+                         const TacsScalar X[], const TacsScalar grad[],
+                         const TacsScalar psi[], int dvLen, TacsScalar dfdx[]);
 
   // The name of the constitutive object
   const char *getObjectName();

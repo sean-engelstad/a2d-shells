@@ -2,9 +2,8 @@
 #define TACS_SHELL_ELEMENT_MODEL_H
 
 #include "TACSElementAlgebra.h"
-// #include "TACSElementVerification.h"
+#include "TACSElementVerification.h"
 #include "TACSShellConstitutive.h"
-#include "TACSShellElementQuadBasis.h"
 
 class TACSShellLinearModel {
  public:
@@ -361,6 +360,70 @@ class TACSShellLinearModel {
           int jj = vars_per_node * (j / 3) + (j % 3);
           mat[nvars * ii + jj] +=
               du1[i] * du2[j] + du1[i] * etu[j] + etu[i] * du1[j];
+        }
+      }
+    }
+  }
+
+  /*
+    Compute the directional derivative
+  */
+  template <int vars_per_node, class basis>
+  static void computeTyingStrainDeriv(
+      const TacsScalar Xpts[], const TacsScalar fn[], const TacsScalar vars[],
+      const TacsScalar d[], const TacsScalar varsd[], const TacsScalar dd[],
+      TacsScalar ety[], TacsScalar etyd[]) {
+    for (int index = 0; index < basis::NUM_TYING_POINTS; index++) {
+      // Get the field index
+      const TacsShellTyingStrainComponent field = basis::getTyingField(index);
+
+      // Get the tying point parametric location
+      double pt[2];
+      basis::getTyingPoint(index, pt);
+
+      // Interpolate the field value
+      TacsScalar Uxi[6], Xxi[6], Uxid[6];
+      basis::template interpFieldsGrad<3, 3>(pt, Xpts, Xxi);
+      basis::template interpFieldsGrad<vars_per_node, 3>(pt, vars, Uxi);
+      basis::template interpFieldsGrad<vars_per_node, 3>(pt, varsd, Uxid);
+
+      ety[index] = 0.0;
+      if (field == TACS_SHELL_G11_COMPONENT) {
+        // Compute g11 = e1^{T}*G*e1
+        ety[index] = (Uxi[0] * Xxi[0] + Uxi[2] * Xxi[2] + Uxi[4] * Xxi[4]);
+        etyd[index] = (Uxid[0] * Xxi[0] + Uxid[2] * Xxi[2] + Uxid[4] * Xxi[4]);
+      } else if (field == TACS_SHELL_G22_COMPONENT) {
+        // Compute g22 = e2^{T}*G*e2
+        ety[index] = (Uxi[1] * Xxi[1] + Uxi[3] * Xxi[3] + Uxi[5] * Xxi[5]);
+        etyd[index] = (Uxid[1] * Xxi[1] + Uxid[3] * Xxi[3] + Uxid[5] * Xxi[5]);
+      } else if (field == TACS_SHELL_G12_COMPONENT) {
+        // Compute g12 = e2^{T}*G*e1
+        ety[index] =
+            0.5 * (Uxi[0] * Xxi[1] + Uxi[2] * Xxi[3] + Uxi[4] * Xxi[5] +
+                   Uxi[1] * Xxi[0] + Uxi[3] * Xxi[2] + Uxi[5] * Xxi[4]);
+        etyd[index] =
+            0.5 * (Uxid[0] * Xxi[1] + Uxid[2] * Xxi[3] + Uxid[4] * Xxi[5] +
+                   Uxid[1] * Xxi[0] + Uxid[3] * Xxi[2] + Uxid[5] * Xxi[4]);
+      } else {
+        TacsScalar d0[3], d0d[3], n0[3];
+        basis::template interpFields<3, 3>(pt, d, d0);
+        basis::template interpFields<3, 3>(pt, dd, d0d);
+        basis::template interpFields<3, 3>(pt, fn, n0);
+
+        if (field == TACS_SHELL_G23_COMPONENT) {
+          // Compute g23 = e2^{T}*G*e3
+          ety[index] = 0.5 * (Xxi[1] * d0[0] + Xxi[3] * d0[1] + Xxi[5] * d0[2] +
+                              n0[0] * Uxi[1] + n0[1] * Uxi[3] + n0[2] * Uxi[5]);
+          etyd[index] =
+              0.5 * (Xxi[1] * d0d[0] + Xxi[3] * d0d[1] + Xxi[5] * d0d[2] +
+                     n0[0] * Uxid[1] + n0[1] * Uxid[3] + n0[2] * Uxid[5]);
+        } else if (field == TACS_SHELL_G13_COMPONENT) {
+          // Compute g13 = e1^{T}*G*e3
+          ety[index] = 0.5 * (Xxi[0] * d0[0] + Xxi[2] * d0[1] + Xxi[4] * d0[2] +
+                              n0[0] * Uxi[0] + n0[1] * Uxi[2] + n0[2] * Uxi[4]);
+          etyd[index] =
+              0.5 * (Xxi[0] * d0d[0] + Xxi[2] * d0d[1] + Xxi[4] * d0d[2] +
+                     n0[0] * Uxid[0] + n0[1] * Uxid[2] + n0[2] * Uxid[4]);
         }
       }
     }
@@ -1653,405 +1716,405 @@ class TACSShellNonlinearModel {
   }
 };
 
-// template <int vars_per_node, class basis, class model>
-// int TacsTestShellModelDerivatives(double dh = 1e-7, int test_print_level = 2,
-//                                   double test_fail_atol = 1e-5,
-//                                   double test_fail_rtol = 1e-5) {
-//   // Set the failure flag
-//   int fail = 0;
+template <int vars_per_node, class basis, class model>
+int TacsTestShellModelDerivatives(double dh = 1e-7, int test_print_level = 2,
+                                  double test_fail_atol = 1e-5,
+                                  double test_fail_rtol = 1e-5) {
+  // Set the failure flag
+  int fail = 0;
 
-//   // Set random values for the constitutive data and inputs
-//   TacsScalar Cs[TACSShellConstitutive::NUM_TANGENT_STIFFNESS_ENTRIES];
-//   TacsScalar u0x[9], u1x[9], e0ty[6];
-//   TacsScalar detXd;
+  // Set random values for the constitutive data and inputs
+  TacsScalar Cs[TACSShellConstitutive::NUM_TANGENT_STIFFNESS_ENTRIES];
+  TacsScalar u0x[9], u1x[9], e0ty[6];
+  TacsScalar detXd;
 
-//   // Set random data
-//   TacsGenerateRandomArray(Cs,
-//                           TACSShellConstitutive::NUM_TANGENT_STIFFNESS_ENTRIES);
-//   TacsGenerateRandomArray(u0x, 9);
-//   TacsGenerateRandomArray(u1x, 9);
-//   TacsGenerateRandomArray(e0ty, 6);
-//   TacsGenerateRandomArray(&detXd, 1);
+  // Set random data
+  TacsGenerateRandomArray(Cs,
+                          TACSShellConstitutive::NUM_TANGENT_STIFFNESS_ENTRIES);
+  TacsGenerateRandomArray(u0x, 9);
+  TacsGenerateRandomArray(u1x, 9);
+  TacsGenerateRandomArray(e0ty, 6);
+  TacsGenerateRandomArray(&detXd, 1);
 
-//   // Compute the strain
-//   TacsScalar e[9];
-//   model::evalStrain(u0x, u1x, e0ty, e);
-//   e[8] = 0.0;
+  // Compute the strain
+  TacsScalar e[9];
+  model::evalStrain(u0x, u1x, e0ty, e);
+  e[8] = 0.0;
 
-//   // Compute the stress
-//   TacsScalar s[9];
-//   TacsScalar drill;
-//   const TacsScalar *A, *B, *D, *As;
-//   TACSShellConstitutive::extractTangentStiffness(Cs, &A, &B, &D, &As, &drill);
-//   TACSShellConstitutive::computeStress(A, B, D, As, drill, e, s);
+  // Compute the stress
+  TacsScalar s[9];
+  TacsScalar drill;
+  const TacsScalar *A, *B, *D, *As;
+  TACSShellConstitutive::extractTangentStiffness(Cs, &A, &B, &D, &As, &drill);
+  TACSShellConstitutive::computeStress(A, B, D, As, drill, e, s);
 
-//   // Compute the derivative of the product of the stress and strain
-//   // with respect to u0x, u1x and e0ty
-//   TacsScalar du0x[9], du1x[9], de0ty[6];
-//   model::evalStrainSens(detXd, s, u0x, u1x, du0x, du1x, de0ty);
+  // Compute the derivative of the product of the stress and strain
+  // with respect to u0x, u1x and e0ty
+  TacsScalar du0x[9], du1x[9], de0ty[6];
+  model::evalStrainSens(detXd, s, u0x, u1x, du0x, du1x, de0ty);
 
-//   TacsScalar f0 = 0.0;
-//   for (int j = 0; j < 9; j++) {
-//     f0 += 0.5 * detXd * e[j] * s[j];
-//   }
+  TacsScalar f0 = 0.0;
+  for (int j = 0; j < 9; j++) {
+    f0 += 0.5 * detXd * e[j] * s[j];
+  }
 
-//   // Compute against the derivatives for the strain
-//   TacsScalar fdu0x[9];
-//   for (int i = 0; i < 9; i++) {
-//     TacsScalar u0xt[9], et[9], st[9];
-//     memcpy(u0xt, u0x, 9 * sizeof(TacsScalar));
+  // Compute against the derivatives for the strain
+  TacsScalar fdu0x[9];
+  for (int i = 0; i < 9; i++) {
+    TacsScalar u0xt[9], et[9], st[9];
+    memcpy(u0xt, u0x, 9 * sizeof(TacsScalar));
 
-// #ifdef TACS_USE_COMPLEX
-//     u0xt[i] = u0x[i] + TacsScalar(0.0, dh);
-// #else
-//     u0xt[i] = u0x[i] + dh;
-// #endif  // TACS_USE_COMPLEX
-//     model::evalStrain(u0xt, u1x, e0ty, et);
-//     et[8] = 0.0;
-//     TACSShellConstitutive::computeStress(A, B, D, As, drill, et, st);
+#ifdef TACS_USE_COMPLEX
+    u0xt[i] = u0x[i] + TacsScalar(0.0, dh);
+#else
+    u0xt[i] = u0x[i] + dh;
+#endif  // TACS_USE_COMPLEX
+    model::evalStrain(u0xt, u1x, e0ty, et);
+    et[8] = 0.0;
+    TACSShellConstitutive::computeStress(A, B, D, As, drill, et, st);
 
-//     TacsScalar f1 = 0.0;
-//     for (int j = 0; j < 9; j++) {
-//       f1 += 0.5 * detXd * et[j] * st[j];
-//     }
+    TacsScalar f1 = 0.0;
+    for (int j = 0; j < 9; j++) {
+      f1 += 0.5 * detXd * et[j] * st[j];
+    }
 
-// #ifdef TACS_USE_COMPLEX
-//     fdu0x[i] = TacsImagPart(f1) / dh;
-// #else
-//     fdu0x[i] = (f1 - f0) / dh;
-// #endif  // TACS_USE_COMPLEX
-//   }
+#ifdef TACS_USE_COMPLEX
+    fdu0x[i] = TacsImagPart(f1) / dh;
+#else
+    fdu0x[i] = (f1 - f0) / dh;
+#endif  // TACS_USE_COMPLEX
+  }
 
-//   // Compute the error
-//   int max_err_index, max_rel_index;
-//   double max_err = TacsGetMaxError(du0x, fdu0x, 9, &max_err_index);
-//   double max_rel = TacsGetMaxRelError(du0x, fdu0x, 9, &max_rel_index);
+  // Compute the error
+  int max_err_index, max_rel_index;
+  double max_err = TacsGetMaxError(du0x, fdu0x, 9, &max_err_index);
+  double max_rel = TacsGetMaxRelError(du0x, fdu0x, 9, &max_rel_index);
 
-//   if (test_print_level > 0) {
-//     fprintf(stderr, "Testing the derivative w.r.t. u0x\n");
-//     fprintf(stderr, "Max Err: %10.4e in component %d.\n", max_err,
-//             max_err_index);
-//     fprintf(stderr, "Max REr: %10.4e in component %d.\n", max_rel,
-//             max_rel_index);
-//   }
-//   // Print the error if required
-//   if (test_print_level > 1) {
-//     TacsPrintErrorComponents(stderr, "du0x", du0x, fdu0x, 9);
-//   }
-//   if (test_print_level) {
-//     fprintf(stderr, "\n");
-//   }
+  if (test_print_level > 0) {
+    fprintf(stderr, "Testing the derivative w.r.t. u0x\n");
+    fprintf(stderr, "Max Err: %10.4e in component %d.\n", max_err,
+            max_err_index);
+    fprintf(stderr, "Max REr: %10.4e in component %d.\n", max_rel,
+            max_rel_index);
+  }
+  // Print the error if required
+  if (test_print_level > 1) {
+    TacsPrintErrorComponents(stderr, "du0x", du0x, fdu0x, 9);
+  }
+  if (test_print_level) {
+    fprintf(stderr, "\n");
+  }
 
-//   fail = (max_err > test_fail_atol || max_rel > test_fail_rtol);
+  fail = (max_err > test_fail_atol || max_rel > test_fail_rtol);
 
-//   // Compute against the derivatives for the strain
-//   TacsScalar fdu1x[9];
-//   for (int i = 0; i < 9; i++) {
-//     TacsScalar u1xt[9], et[9], st[9];
-//     memcpy(u1xt, u1x, 9 * sizeof(TacsScalar));
+  // Compute against the derivatives for the strain
+  TacsScalar fdu1x[9];
+  for (int i = 0; i < 9; i++) {
+    TacsScalar u1xt[9], et[9], st[9];
+    memcpy(u1xt, u1x, 9 * sizeof(TacsScalar));
 
-// #ifdef TACS_USE_COMPLEX
-//     u1xt[i] = u1x[i] + TacsScalar(0.0, dh);
-// #else
-//     u1xt[i] = u1x[i] + dh;
-// #endif  // TACS_USE_COMPLEX
-//     model::evalStrain(u0x, u1xt, e0ty, et);
-//     et[8] = 0.0;
-//     TACSShellConstitutive::computeStress(A, B, D, As, drill, et, st);
+#ifdef TACS_USE_COMPLEX
+    u1xt[i] = u1x[i] + TacsScalar(0.0, dh);
+#else
+    u1xt[i] = u1x[i] + dh;
+#endif  // TACS_USE_COMPLEX
+    model::evalStrain(u0x, u1xt, e0ty, et);
+    et[8] = 0.0;
+    TACSShellConstitutive::computeStress(A, B, D, As, drill, et, st);
 
-//     TacsScalar f1 = 0.0;
-//     for (int j = 0; j < 9; j++) {
-//       f1 += 0.5 * detXd * et[j] * st[j];
-//     }
+    TacsScalar f1 = 0.0;
+    for (int j = 0; j < 9; j++) {
+      f1 += 0.5 * detXd * et[j] * st[j];
+    }
 
-// #ifdef TACS_USE_COMPLEX
-//     fdu1x[i] = TacsImagPart(f1) / dh;
-// #else
-//     fdu1x[i] = (f1 - f0) / dh;
-// #endif  // TACS_USE_COMPLEX
-//   }
+#ifdef TACS_USE_COMPLEX
+    fdu1x[i] = TacsImagPart(f1) / dh;
+#else
+    fdu1x[i] = (f1 - f0) / dh;
+#endif  // TACS_USE_COMPLEX
+  }
 
-//   // Compute the error
-//   max_err = TacsGetMaxError(du1x, fdu1x, 9, &max_err_index);
-//   max_rel = TacsGetMaxRelError(du1x, fdu1x, 9, &max_rel_index);
+  // Compute the error
+  max_err = TacsGetMaxError(du1x, fdu1x, 9, &max_err_index);
+  max_rel = TacsGetMaxRelError(du1x, fdu1x, 9, &max_rel_index);
 
-//   if (test_print_level > 0) {
-//     fprintf(stderr, "Testing the derivative w.r.t. u1x\n");
-//     fprintf(stderr, "Max Err: %10.4e in component %d.\n", max_err,
-//             max_err_index);
-//     fprintf(stderr, "Max REr: %10.4e in component %d.\n", max_rel,
-//             max_rel_index);
-//   }
-//   // Print the error if required
-//   if (test_print_level > 1) {
-//     TacsPrintErrorComponents(stderr, "du1x", du1x, fdu1x, 9);
-//   }
-//   if (test_print_level) {
-//     fprintf(stderr, "\n");
-//   }
+  if (test_print_level > 0) {
+    fprintf(stderr, "Testing the derivative w.r.t. u1x\n");
+    fprintf(stderr, "Max Err: %10.4e in component %d.\n", max_err,
+            max_err_index);
+    fprintf(stderr, "Max REr: %10.4e in component %d.\n", max_rel,
+            max_rel_index);
+  }
+  // Print the error if required
+  if (test_print_level > 1) {
+    TacsPrintErrorComponents(stderr, "du1x", du1x, fdu1x, 9);
+  }
+  if (test_print_level) {
+    fprintf(stderr, "\n");
+  }
 
-//   fail = (max_err > test_fail_atol || max_rel > test_fail_rtol);
+  fail = (max_err > test_fail_atol || max_rel > test_fail_rtol);
 
-//   // Compute against the derivatives for the strain
-//   TacsScalar fde0ty[6];
-//   for (int i = 0; i < 6; i++) {
-//     TacsScalar e0tyt[6], et[9], st[9];
-//     memcpy(e0tyt, e0ty, 6 * sizeof(TacsScalar));
+  // Compute against the derivatives for the strain
+  TacsScalar fde0ty[6];
+  for (int i = 0; i < 6; i++) {
+    TacsScalar e0tyt[6], et[9], st[9];
+    memcpy(e0tyt, e0ty, 6 * sizeof(TacsScalar));
 
-// #ifdef TACS_USE_COMPLEX
-//     e0tyt[i] = e0ty[i] + TacsScalar(0.0, dh);
-// #else
-//     e0tyt[i] = e0ty[i] + dh;
-// #endif  // TACS_USE_COMPLEX
-//     model::evalStrain(u0x, u1x, e0tyt, et);
-//     et[8] = 0.0;
-//     TACSShellConstitutive::computeStress(A, B, D, As, drill, et, st);
+#ifdef TACS_USE_COMPLEX
+    e0tyt[i] = e0ty[i] + TacsScalar(0.0, dh);
+#else
+    e0tyt[i] = e0ty[i] + dh;
+#endif  // TACS_USE_COMPLEX
+    model::evalStrain(u0x, u1x, e0tyt, et);
+    et[8] = 0.0;
+    TACSShellConstitutive::computeStress(A, B, D, As, drill, et, st);
 
-//     TacsScalar f1 = 0.0;
-//     for (int j = 0; j < 9; j++) {
-//       f1 += 0.5 * detXd * et[j] * st[j];
-//     }
+    TacsScalar f1 = 0.0;
+    for (int j = 0; j < 9; j++) {
+      f1 += 0.5 * detXd * et[j] * st[j];
+    }
 
-// #ifdef TACS_USE_COMPLEX
-//     fde0ty[i] = TacsImagPart(f1) / dh;
-// #else
-//     fde0ty[i] = (f1 - f0) / dh;
-// #endif  // TACS_USE_COMPLEX
-//   }
+#ifdef TACS_USE_COMPLEX
+    fde0ty[i] = TacsImagPart(f1) / dh;
+#else
+    fde0ty[i] = (f1 - f0) / dh;
+#endif  // TACS_USE_COMPLEX
+  }
 
-//   // Compute the error
-//   max_err = TacsGetMaxError(de0ty, fde0ty, 6, &max_err_index);
-//   max_rel = TacsGetMaxRelError(de0ty, fde0ty, 6, &max_rel_index);
+  // Compute the error
+  max_err = TacsGetMaxError(de0ty, fde0ty, 6, &max_err_index);
+  max_rel = TacsGetMaxRelError(de0ty, fde0ty, 6, &max_rel_index);
 
-//   if (test_print_level > 0) {
-//     fprintf(stderr, "Testing the derivative w.r.t. e0ty\n");
-//     fprintf(stderr, "Max Err: %10.4e in component %d.\n", max_err,
-//             max_err_index);
-//     fprintf(stderr, "Max REr: %10.4e in component %d.\n", max_rel,
-//             max_rel_index);
-//   }
-//   // Print the error if required
-//   if (test_print_level > 1) {
-//     TacsPrintErrorComponents(stderr, "de0ty", de0ty, fde0ty, 6);
-//   }
-//   if (test_print_level) {
-//     fprintf(stderr, "\n");
-//   }
+  if (test_print_level > 0) {
+    fprintf(stderr, "Testing the derivative w.r.t. e0ty\n");
+    fprintf(stderr, "Max Err: %10.4e in component %d.\n", max_err,
+            max_err_index);
+    fprintf(stderr, "Max REr: %10.4e in component %d.\n", max_rel,
+            max_rel_index);
+  }
+  // Print the error if required
+  if (test_print_level > 1) {
+    TacsPrintErrorComponents(stderr, "de0ty", de0ty, fde0ty, 6);
+  }
+  if (test_print_level) {
+    fprintf(stderr, "\n");
+  }
 
-//   fail = (max_err > test_fail_atol || max_rel > test_fail_rtol);
+  fail = (max_err > test_fail_atol || max_rel > test_fail_rtol);
 
-//   TacsScalar d2u0x[81], d2u1x[81], d2u0xu1x[81];
-//   TacsScalar d2e0ty[36], d2e0tyu0x[54], d2e0tyu1x[54];
-//   model::evalStrainHessian(detXd, s, Cs, u0x, u1x, e0ty, d2u0x, d2u1x, d2u0xu1x,
-//                            d2e0ty, d2e0tyu0x, d2e0tyu1x);
+  TacsScalar d2u0x[81], d2u1x[81], d2u0xu1x[81];
+  TacsScalar d2e0ty[36], d2e0tyu0x[54], d2e0tyu1x[54];
+  model::evalStrainHessian(detXd, s, Cs, u0x, u1x, e0ty, d2u0x, d2u1x, d2u0xu1x,
+                           d2e0ty, d2e0tyu0x, d2e0tyu1x);
 
-//   // Compute against the derivatives for the strain
-//   TacsScalar fd2u0x[81], fd2u0xu1x[81];
-//   for (int i = 0; i < 9; i++) {
-//     TacsScalar u0xt[9], et[9], st[9];
-//     memcpy(u0xt, u0x, 9 * sizeof(TacsScalar));
+  // Compute against the derivatives for the strain
+  TacsScalar fd2u0x[81], fd2u0xu1x[81];
+  for (int i = 0; i < 9; i++) {
+    TacsScalar u0xt[9], et[9], st[9];
+    memcpy(u0xt, u0x, 9 * sizeof(TacsScalar));
 
-// #ifdef TACS_USE_COMPLEX
-//     u0xt[i] = u0x[i] + TacsScalar(0.0, dh);
-// #else
-//     u0xt[i] = u0x[i] + dh;
-// #endif  // TACS_USE_COMPLEX
-//     model::evalStrain(u0xt, u1x, e0ty, et);
-//     et[8] = 0.0;
-//     TACSShellConstitutive::computeStress(A, B, D, As, drill, et, st);
+#ifdef TACS_USE_COMPLEX
+    u0xt[i] = u0x[i] + TacsScalar(0.0, dh);
+#else
+    u0xt[i] = u0x[i] + dh;
+#endif  // TACS_USE_COMPLEX
+    model::evalStrain(u0xt, u1x, e0ty, et);
+    et[8] = 0.0;
+    TACSShellConstitutive::computeStress(A, B, D, As, drill, et, st);
 
-//     TacsScalar du0xt[9], du1xt[9], de0tyt[6];
-//     model::evalStrainSens(detXd, st, u0xt, u1x, du0xt, du1xt, de0tyt);
+    TacsScalar du0xt[9], du1xt[9], de0tyt[6];
+    model::evalStrainSens(detXd, st, u0xt, u1x, du0xt, du1xt, de0tyt);
 
-//     for (int j = 0; j < 9; j++) {
-// #ifdef TACS_USE_COMPLEX
-//       fd2u0x[9 * i + j] = TacsImagPart(du0xt[j]) / dh;
-//       fd2u0xu1x[9 * i + j] = TacsImagPart(du1xt[j]) / dh;
-// #else
-//       fd2u0x[9 * i + j] = (du0xt[j] - du0x[j]) / dh;
-//       fd2u0xu1x[9 * i + j] = (du1xt[j] - du1x[j]) / dh;
-// #endif  // TACS_USE_COMPLEX
-//     }
-//   }
+    for (int j = 0; j < 9; j++) {
+#ifdef TACS_USE_COMPLEX
+      fd2u0x[9 * i + j] = TacsImagPart(du0xt[j]) / dh;
+      fd2u0xu1x[9 * i + j] = TacsImagPart(du1xt[j]) / dh;
+#else
+      fd2u0x[9 * i + j] = (du0xt[j] - du0x[j]) / dh;
+      fd2u0xu1x[9 * i + j] = (du1xt[j] - du1x[j]) / dh;
+#endif  // TACS_USE_COMPLEX
+    }
+  }
 
-//   // Compute the error
-//   max_err = TacsGetMaxError(d2u0x, fd2u0x, 81, &max_err_index);
-//   max_rel = TacsGetMaxRelError(d2u0x, fd2u0x, 81, &max_rel_index);
+  // Compute the error
+  max_err = TacsGetMaxError(d2u0x, fd2u0x, 81, &max_err_index);
+  max_rel = TacsGetMaxRelError(d2u0x, fd2u0x, 81, &max_rel_index);
 
-//   if (test_print_level > 0) {
-//     fprintf(stderr, "Testing the second derivative w.r.t. u0x\n");
-//     fprintf(stderr, "Max Err: %10.4e in component %d.\n", max_err,
-//             max_err_index);
-//     fprintf(stderr, "Max REr: %10.4e in component %d.\n", max_rel,
-//             max_rel_index);
-//   }
-//   // Print the error if required
-//   if (test_print_level > 1) {
-//     TacsPrintErrorComponents(stderr, "d2u0x", d2u0x, fd2u0x, 81);
-//   }
-//   if (test_print_level) {
-//     fprintf(stderr, "\n");
-//   }
+  if (test_print_level > 0) {
+    fprintf(stderr, "Testing the second derivative w.r.t. u0x\n");
+    fprintf(stderr, "Max Err: %10.4e in component %d.\n", max_err,
+            max_err_index);
+    fprintf(stderr, "Max REr: %10.4e in component %d.\n", max_rel,
+            max_rel_index);
+  }
+  // Print the error if required
+  if (test_print_level > 1) {
+    TacsPrintErrorComponents(stderr, "d2u0x", d2u0x, fd2u0x, 81);
+  }
+  if (test_print_level) {
+    fprintf(stderr, "\n");
+  }
 
-//   // Compute the error
-//   max_err = TacsGetMaxError(d2u0xu1x, fd2u0xu1x, 81, &max_err_index);
-//   max_rel = TacsGetMaxRelError(d2u0xu1x, fd2u0xu1x, 81, &max_rel_index);
+  // Compute the error
+  max_err = TacsGetMaxError(d2u0xu1x, fd2u0xu1x, 81, &max_err_index);
+  max_rel = TacsGetMaxRelError(d2u0xu1x, fd2u0xu1x, 81, &max_rel_index);
 
-//   if (test_print_level > 0) {
-//     fprintf(stderr, "Testing the second derivative w.r.t. u0x and u1x\n");
-//     fprintf(stderr, "Max Err: %10.4e in component %d.\n", max_err,
-//             max_err_index);
-//     fprintf(stderr, "Max REr: %10.4e in component %d.\n", max_rel,
-//             max_rel_index);
-//   }
-//   // Print the error if required
-//   if (test_print_level > 1) {
-//     TacsPrintErrorComponents(stderr, "d2u0xu1x", d2u0xu1x, fd2u0xu1x, 81);
-//   }
-//   if (test_print_level) {
-//     fprintf(stderr, "\n");
-//   }
+  if (test_print_level > 0) {
+    fprintf(stderr, "Testing the second derivative w.r.t. u0x and u1x\n");
+    fprintf(stderr, "Max Err: %10.4e in component %d.\n", max_err,
+            max_err_index);
+    fprintf(stderr, "Max REr: %10.4e in component %d.\n", max_rel,
+            max_rel_index);
+  }
+  // Print the error if required
+  if (test_print_level > 1) {
+    TacsPrintErrorComponents(stderr, "d2u0xu1x", d2u0xu1x, fd2u0xu1x, 81);
+  }
+  if (test_print_level) {
+    fprintf(stderr, "\n");
+  }
 
-//   // Compute against the derivatives for the strain
-//   TacsScalar fd2u1x[81];
-//   for (int i = 0; i < 9; i++) {
-//     TacsScalar u1xt[9], et[9], st[9];
-//     memcpy(u1xt, u1x, 9 * sizeof(TacsScalar));
+  // Compute against the derivatives for the strain
+  TacsScalar fd2u1x[81];
+  for (int i = 0; i < 9; i++) {
+    TacsScalar u1xt[9], et[9], st[9];
+    memcpy(u1xt, u1x, 9 * sizeof(TacsScalar));
 
-// #ifdef TACS_USE_COMPLEX
-//     u1xt[i] = u1x[i] + TacsScalar(0.0, dh);
-// #else
-//     u1xt[i] = u1x[i] + dh;
-// #endif  // TACS_USE_COMPLEX
-//     model::evalStrain(u0x, u1xt, e0ty, et);
-//     et[8] = 0.0;
-//     TACSShellConstitutive::computeStress(A, B, D, As, drill, et, st);
+#ifdef TACS_USE_COMPLEX
+    u1xt[i] = u1x[i] + TacsScalar(0.0, dh);
+#else
+    u1xt[i] = u1x[i] + dh;
+#endif  // TACS_USE_COMPLEX
+    model::evalStrain(u0x, u1xt, e0ty, et);
+    et[8] = 0.0;
+    TACSShellConstitutive::computeStress(A, B, D, As, drill, et, st);
 
-//     TacsScalar du0xt[9], du1xt[9], de0tyt[6];
-//     model::evalStrainSens(detXd, st, u0x, u1xt, du0xt, du1xt, de0tyt);
+    TacsScalar du0xt[9], du1xt[9], de0tyt[6];
+    model::evalStrainSens(detXd, st, u0x, u1xt, du0xt, du1xt, de0tyt);
 
-//     for (int j = 0; j < 9; j++) {
-// #ifdef TACS_USE_COMPLEX
-//       fd2u1x[9 * i + j] = TacsImagPart(du1xt[j]) / dh;
-// #else
-//       fd2u1x[9 * i + j] = (du1xt[j] - du1x[j]) / dh;
-// #endif  // TACS_USE_COMPLEX
-//     }
-//   }
+    for (int j = 0; j < 9; j++) {
+#ifdef TACS_USE_COMPLEX
+      fd2u1x[9 * i + j] = TacsImagPart(du1xt[j]) / dh;
+#else
+      fd2u1x[9 * i + j] = (du1xt[j] - du1x[j]) / dh;
+#endif  // TACS_USE_COMPLEX
+    }
+  }
 
-//   // Compute the error
-//   max_err = TacsGetMaxError(d2u1x, fd2u1x, 81, &max_err_index);
-//   max_rel = TacsGetMaxRelError(d2u1x, fd2u1x, 81, &max_rel_index);
+  // Compute the error
+  max_err = TacsGetMaxError(d2u1x, fd2u1x, 81, &max_err_index);
+  max_rel = TacsGetMaxRelError(d2u1x, fd2u1x, 81, &max_rel_index);
 
-//   if (test_print_level > 0) {
-//     fprintf(stderr, "Testing the second derivative w.r.t. u1x\n");
-//     fprintf(stderr, "Max Err: %10.4e in component %d.\n", max_err,
-//             max_err_index);
-//     fprintf(stderr, "Max REr: %10.4e in component %d.\n", max_rel,
-//             max_rel_index);
-//   }
-//   // Print the error if required
-//   if (test_print_level > 1) {
-//     TacsPrintErrorComponents(stderr, "d2u1x", d2u0x, fd2u0x, 81);
-//   }
-//   if (test_print_level) {
-//     fprintf(stderr, "\n");
-//   }
+  if (test_print_level > 0) {
+    fprintf(stderr, "Testing the second derivative w.r.t. u1x\n");
+    fprintf(stderr, "Max Err: %10.4e in component %d.\n", max_err,
+            max_err_index);
+    fprintf(stderr, "Max REr: %10.4e in component %d.\n", max_rel,
+            max_rel_index);
+  }
+  // Print the error if required
+  if (test_print_level > 1) {
+    TacsPrintErrorComponents(stderr, "d2u1x", d2u0x, fd2u0x, 81);
+  }
+  if (test_print_level) {
+    fprintf(stderr, "\n");
+  }
 
-//   TacsScalar fd2e0ty[36], fd2e0tyu0x[54], fd2e0tyu1x[54];
-//   for (int i = 0; i < 6; i++) {
-//     TacsScalar e0tyt[6], et[9], st[9];
-//     memcpy(e0tyt, e0ty, 6 * sizeof(TacsScalar));
+  TacsScalar fd2e0ty[36], fd2e0tyu0x[54], fd2e0tyu1x[54];
+  for (int i = 0; i < 6; i++) {
+    TacsScalar e0tyt[6], et[9], st[9];
+    memcpy(e0tyt, e0ty, 6 * sizeof(TacsScalar));
 
-// #ifdef TACS_USE_COMPLEX
-//     e0tyt[i] = e0ty[i] + TacsScalar(0.0, dh);
-// #else
-//     e0tyt[i] = e0ty[i] + dh;
-// #endif  // TACS_USE_COMPLEX
-//     model::evalStrain(u0x, u1x, e0tyt, et);
-//     et[8] = 0.0;
-//     TACSShellConstitutive::computeStress(A, B, D, As, drill, et, st);
+#ifdef TACS_USE_COMPLEX
+    e0tyt[i] = e0ty[i] + TacsScalar(0.0, dh);
+#else
+    e0tyt[i] = e0ty[i] + dh;
+#endif  // TACS_USE_COMPLEX
+    model::evalStrain(u0x, u1x, e0tyt, et);
+    et[8] = 0.0;
+    TACSShellConstitutive::computeStress(A, B, D, As, drill, et, st);
 
-//     TacsScalar du0xt[9], du1xt[9], de0tyt[6];
-//     model::evalStrainSens(detXd, st, u0x, u1x, du0xt, du1xt, de0tyt);
+    TacsScalar du0xt[9], du1xt[9], de0tyt[6];
+    model::evalStrainSens(detXd, st, u0x, u1x, du0xt, du1xt, de0tyt);
 
-//     for (int j = 0; j < 6; j++) {
-// #ifdef TACS_USE_COMPLEX
-//       fd2e0ty[6 * i + j] = TacsImagPart(de0tyt[j]) / dh;
-// #else
-//       fd2e0ty[6 * i + j] = (de0tyt[j] - de0ty[j]) / dh;
-// #endif  // TACS_USE_COMPLEX
-//     }
+    for (int j = 0; j < 6; j++) {
+#ifdef TACS_USE_COMPLEX
+      fd2e0ty[6 * i + j] = TacsImagPart(de0tyt[j]) / dh;
+#else
+      fd2e0ty[6 * i + j] = (de0tyt[j] - de0ty[j]) / dh;
+#endif  // TACS_USE_COMPLEX
+    }
 
-//     for (int j = 0; j < 9; j++) {
-// #ifdef TACS_USE_COMPLEX
-//       fd2e0tyu0x[9 * i + j] = TacsImagPart(du0xt[j]) / dh;
-//       fd2e0tyu1x[9 * i + j] = TacsImagPart(du1xt[j]) / dh;
-// #else
-//       fd2e0tyu0x[9 * i + j] = (du0xt[j] - du0x[j]) / dh;
-//       fd2e0tyu1x[9 * i + j] = (du1xt[j] - du1x[j]) / dh;
-// #endif  // TACS_USE_COMPLEX
-//     }
-//   }
+    for (int j = 0; j < 9; j++) {
+#ifdef TACS_USE_COMPLEX
+      fd2e0tyu0x[9 * i + j] = TacsImagPart(du0xt[j]) / dh;
+      fd2e0tyu1x[9 * i + j] = TacsImagPart(du1xt[j]) / dh;
+#else
+      fd2e0tyu0x[9 * i + j] = (du0xt[j] - du0x[j]) / dh;
+      fd2e0tyu1x[9 * i + j] = (du1xt[j] - du1x[j]) / dh;
+#endif  // TACS_USE_COMPLEX
+    }
+  }
 
-//   // Compute the error
-//   max_err = TacsGetMaxError(d2e0ty, fd2e0ty, 36, &max_err_index);
-//   max_rel = TacsGetMaxRelError(d2e0ty, fd2e0ty, 36, &max_rel_index);
+  // Compute the error
+  max_err = TacsGetMaxError(d2e0ty, fd2e0ty, 36, &max_err_index);
+  max_rel = TacsGetMaxRelError(d2e0ty, fd2e0ty, 36, &max_rel_index);
 
-//   if (test_print_level > 0) {
-//     fprintf(stderr, "Testing the second derivative w.r.t. e0ty\n");
-//     fprintf(stderr, "Max Err: %10.4e in component %d.\n", max_err,
-//             max_err_index);
-//     fprintf(stderr, "Max REr: %10.4e in component %d.\n", max_rel,
-//             max_rel_index);
-//   }
-//   // Print the error if required
-//   if (test_print_level > 1) {
-//     TacsPrintErrorComponents(stderr, "d2e0ty", d2e0ty, fd2e0ty, 36);
-//   }
-//   if (test_print_level) {
-//     fprintf(stderr, "\n");
-//   }
+  if (test_print_level > 0) {
+    fprintf(stderr, "Testing the second derivative w.r.t. e0ty\n");
+    fprintf(stderr, "Max Err: %10.4e in component %d.\n", max_err,
+            max_err_index);
+    fprintf(stderr, "Max REr: %10.4e in component %d.\n", max_rel,
+            max_rel_index);
+  }
+  // Print the error if required
+  if (test_print_level > 1) {
+    TacsPrintErrorComponents(stderr, "d2e0ty", d2e0ty, fd2e0ty, 36);
+  }
+  if (test_print_level) {
+    fprintf(stderr, "\n");
+  }
 
-//   // Compute the error
-//   max_err = TacsGetMaxError(d2e0tyu0x, fd2e0tyu0x, 54, &max_err_index);
-//   max_rel = TacsGetMaxRelError(d2e0tyu0x, fd2e0tyu0x, 54, &max_rel_index);
+  // Compute the error
+  max_err = TacsGetMaxError(d2e0tyu0x, fd2e0tyu0x, 54, &max_err_index);
+  max_rel = TacsGetMaxRelError(d2e0tyu0x, fd2e0tyu0x, 54, &max_rel_index);
 
-//   if (test_print_level > 0) {
-//     fprintf(stderr, "Testing the second derivative w.r.t. e0ty and u0x\n");
-//     fprintf(stderr, "Max Err: %10.4e in component %d.\n", max_err,
-//             max_err_index);
-//     fprintf(stderr, "Max REr: %10.4e in component %d.\n", max_rel,
-//             max_rel_index);
-//   }
-//   // Print the error if required
-//   if (test_print_level > 1) {
-//     TacsPrintErrorComponents(stderr, "d2e0tyu0x", d2e0tyu0x, fd2e0tyu0x, 54);
-//   }
-//   if (test_print_level) {
-//     fprintf(stderr, "\n");
-//   }
+  if (test_print_level > 0) {
+    fprintf(stderr, "Testing the second derivative w.r.t. e0ty and u0x\n");
+    fprintf(stderr, "Max Err: %10.4e in component %d.\n", max_err,
+            max_err_index);
+    fprintf(stderr, "Max REr: %10.4e in component %d.\n", max_rel,
+            max_rel_index);
+  }
+  // Print the error if required
+  if (test_print_level > 1) {
+    TacsPrintErrorComponents(stderr, "d2e0tyu0x", d2e0tyu0x, fd2e0tyu0x, 54);
+  }
+  if (test_print_level) {
+    fprintf(stderr, "\n");
+  }
 
-//   // Compute the error
-//   max_err = TacsGetMaxError(d2e0tyu1x, fd2e0tyu1x, 54, &max_err_index);
-//   max_rel = TacsGetMaxRelError(d2e0tyu1x, fd2e0tyu1x, 54, &max_rel_index);
+  // Compute the error
+  max_err = TacsGetMaxError(d2e0tyu1x, fd2e0tyu1x, 54, &max_err_index);
+  max_rel = TacsGetMaxRelError(d2e0tyu1x, fd2e0tyu1x, 54, &max_rel_index);
 
-//   if (test_print_level > 0) {
-//     fprintf(stderr, "Testing the second derivative w.r.t. e0ty and u1x\n");
-//     fprintf(stderr, "Max Err: %10.4e in component %d.\n", max_err,
-//             max_err_index);
-//     fprintf(stderr, "Max REr: %10.4e in component %d.\n", max_rel,
-//             max_rel_index);
-//   }
-//   // Print the error if required
-//   if (test_print_level > 1) {
-//     TacsPrintErrorComponents(stderr, "d2e0tyu1x", d2e0tyu1x, fd2e0tyu1x, 54);
-//   }
-//   if (test_print_level) {
-//     fprintf(stderr, "\n");
-//   }
+  if (test_print_level > 0) {
+    fprintf(stderr, "Testing the second derivative w.r.t. e0ty and u1x\n");
+    fprintf(stderr, "Max Err: %10.4e in component %d.\n", max_err,
+            max_err_index);
+    fprintf(stderr, "Max REr: %10.4e in component %d.\n", max_rel,
+            max_rel_index);
+  }
+  // Print the error if required
+  if (test_print_level > 1) {
+    TacsPrintErrorComponents(stderr, "d2e0tyu1x", d2e0tyu1x, fd2e0tyu1x, 54);
+  }
+  if (test_print_level) {
+    fprintf(stderr, "\n");
+  }
 
-//   return fail;
-// }
+  return fail;
+}
 
 #endif  // TACS_SHELL_ELEMENT_MODEL_H

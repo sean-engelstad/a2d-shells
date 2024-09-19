@@ -418,6 +418,29 @@ TacsScalar TACSMaterialProperties::vonMisesFailure3D(const TacsScalar s[]) {
   return fail;
 }
 
+TacsScalar TACSMaterialProperties::vonMisesFailure3DStressSens(
+    const TacsScalar s[], TacsScalar sens[]) {
+  TacsScalar fail = sqrt(
+      0.5 * ((s[0] - s[1]) * (s[0] - s[1]) + (s[0] - s[2]) * (s[0] - s[2]) +
+             (s[1] - s[2]) * (s[1] - s[2]) +
+             6.0 * (s[3] * s[3] + s[4] * s[4] + s[5] * s[5])));
+
+  if (TacsRealPart(fail) != 0.0) {
+    TacsScalar fact = 0.5 / (ys * fail);
+    sens[0] = fact * (2.0 * s[0] - s[1] - s[2]);
+    sens[1] = fact * (2.0 * s[1] - s[0] - s[2]);
+    sens[2] = fact * (2.0 * s[2] - s[0] - s[1]);
+    sens[3] = 6.0 * fact * s[3];
+    sens[4] = 6.0 * fact * s[4];
+    sens[5] = 6.0 * fact * s[5];
+  } else {
+    sens[0] = sens[1] = sens[2] = 0.0;
+    sens[3] = sens[4] = sens[5] = 0.0;
+  }
+
+  return fail / ys;
+}
+
 /*
   Compute the von Mises failure criteria:
 

@@ -47,9 +47,9 @@ extern MPI_Op TACS_MPI_MAX;
 typedef std::complex<double> TacsComplex;
 typedef double TacsReal;
 
-// /*
-//   Define the basic scalar type TacsScalar
-// */
+/*
+  Define the basic scalar type TacsScalar
+*/
 #ifdef TACS_USE_COMPLEX
 #define TACS_MPI_TYPE MPI_DOUBLE_COMPLEX
 typedef TacsComplex TacsScalar;
@@ -57,8 +57,6 @@ typedef TacsComplex TacsScalar;
 #define TACS_MPI_TYPE MPI_DOUBLE
 typedef double TacsScalar;
 #endif
-
-// typedef double TacsScalar;
 
 /*
   Define the macro to add flop counts. This does not work for threaded

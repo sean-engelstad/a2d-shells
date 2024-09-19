@@ -21,23 +21,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <iostream>
-
-const char* TacsMeshLoaderElementTypes[TacsMeshLoaderNumElementTypes] = {
-    "CBAR",  "CQUADR",  "CQUAD4", "CQUAD8", "CQUAD9",
-    "CQUAD", "CHEXA27", "CHEXA",  "CTRIA3", "CTETRA"};
-
-const int TacsMeshLoaderElementLimits[TacsMeshLoaderNumElementTypes][2] = {{2, 2},    // CBAR
-                              {4, 4},    // CQUADR
-                              {4, 4},    // CQUAD4
-                              {8, 8},    // CQUAD8
-                              {9, 9},    // CQUAD9
-                              {9, 9},    // CQUAD
-                              {27, 27},  // CHEXA27
-                              {8, 8},    // CHEXA
-                              {3, 3},    // CTRIA3
-                              {4, 10}};  // CTETRA
-
 
 /*!
   This is an interface for reading NASTRAN-style files.
@@ -121,7 +104,6 @@ static int read_buffer_line(char *line, size_t line_len, size_t *loc,
       break;
     }
     line[i] = buffer[*loc];
-    // printf("line in read_buffer_line = '%c'\n", line[i]);
   }
   if (i < line_len) {
     line[i] = '\0';
@@ -467,11 +449,11 @@ TACSMeshLoader::TACSMeshLoader(MPI_Comm _comm) {
   bc_nodes = bc_vars = bc_ptr = NULL;
 
   num_components = 0;
-  // elements = NULL;
+  elements = NULL;
   component_elems = NULL;
   component_descript = NULL;
 
-  // // Set the creator object to NULL
+  // Set the creator object to NULL
   creator = NULL;
 }
 
@@ -507,14 +489,14 @@ TACSMeshLoader::~TACSMeshLoader() {
     delete[] bc_ptr;
   }
 
-  // if (elements) {
-  //   for (int k = 0; k < num_components; k++) {
-  //     if (elements[k]) {
-  //       elements[k]->decref();
-  //     }
-  //   }
-  //   delete[] elements;
-  // }
+  if (elements) {
+    for (int k = 0; k < num_components; k++) {
+      if (elements[k]) {
+        elements[k]->decref();
+      }
+    }
+    delete[] elements;
+  }
   if (component_elems) {
     delete[] component_elems;
   }
@@ -534,10 +516,10 @@ TACSMeshLoader::~TACSMeshLoader() {
     delete[] elem_arg_sort_list;
   }
 
-  // // Free the creator object
-  // if (creator) {
-  //   creator->decref();
-  // }
+  // Free the creator object
+  if (creator) {
+    creator->decref();
+  }
 }
 
 /*
@@ -585,21 +567,19 @@ const char *TACSMeshLoader::getElementDescript(int comp_num) {
   properties are ignored.
 */
 int TACSMeshLoader::scanBDFFile(const char *file_name) {
-  int rank = 0;
+  int rank;
   MPI_Comm_rank(comm, &rank);
   int fail = 0;
-
-  // printf("Here\n");
 
   const int root = 0;
   if (rank == root) {
     FILE *fp = fopen(file_name, "r");
-    // if (!fp) {
-    //   fprintf(stderr, "TACSMeshLoader: Unable to open file %s\n", file_name);
-    //   fail = 1;
-    //   MPI_Abort(comm, fail);
-    //   return fail;
-    // }
+    if (!fp) {
+      fprintf(stderr, "TACSMeshLoader: Unable to open file %s\n", file_name);
+      fail = 1;
+      MPI_Abort(comm, fail);
+      return fail;
+    }
 
     // Count up the number of nodes, elements and size of connectivity data
     num_nodes = 0;
@@ -624,8 +604,7 @@ int TACSMeshLoader::scanBDFFile(const char *file_name) {
     if (fread(buffer, 1, buffer_len, fp) != buffer_len) {
       fprintf(stderr, "[%d] TACSMeshLoader: Problem reading file %s\n", rank,
               file_name);
-      // MPI_Abort(comm, 1);
-      exit(1);
+      MPI_Abort(comm, 1);
       return 1;
     }
     fclose(fp);
@@ -633,9 +612,6 @@ int TACSMeshLoader::scanBDFFile(const char *file_name) {
     // Keep track of where the current point in the buffer is
     size_t buffer_loc = 0;
     read_buffer_line(line, sizeof(line), &buffer_loc, buffer, buffer_len);
-
-    // printf("line1 %s\n", buffer);
-    // std::flush();
 
     // Flags which indicate where the bulk data begins
     int in_bulk = 0;
@@ -671,8 +647,6 @@ int TACSMeshLoader::scanBDFFile(const char *file_name) {
         fail = 1;
         break;
       }
-
-      // printf("line %d", line[0]);
 
       if (line[0] != '$') {
         if (in_bulk && (strncmp(line, "END BULK", 8) == 0 ||
@@ -719,7 +693,6 @@ int TACSMeshLoader::scanBDFFile(const char *file_name) {
             }
           }
 
-          // printf("index = %d", index);
           if (index >= 0) {
             // Find the number of entries in the element
             int elem_num, component_num, num_conn;
@@ -855,7 +828,6 @@ int TACSMeshLoader::scanBDFFile(const char *file_name) {
           file_Xpts[3 * num_nodes] = x;
           file_Xpts[3 * num_nodes + 1] = y;
           file_Xpts[3 * num_nodes + 2] = z;
-          printf("Reading in GRID\n");
           num_nodes++;
         } else if (strncmp(line, "SPC", 3) == 0) {
           // This is a variable-length format. Read in grid points until
@@ -1069,7 +1041,7 @@ int TACSMeshLoader::scanBDFFile(const char *file_name) {
     delete[] file_conn_ptr;
   }
 
-  // // Distribute the component numbers and descritpions
+  // Distribute the component numbers and descritpions
   MPI_Bcast(&num_components, 1, MPI_INT, root, comm);
   if (rank != root) {
     component_elems = new char[9 * num_components];
@@ -1091,52 +1063,30 @@ int TACSMeshLoader::scanBDFFile(const char *file_name) {
 */
 int TACSMeshLoader::getNumNodes() { return num_nodes; }
 
-// /*
-//   Create a TACSToFH5 file creation object
-// */
-// TACSToFH5 *TACSMeshLoader::createTACSToFH5(TACSAssembler *tacs,
-//                                            ElementType elem_type,
-//                                            int write_flag) {
-//   // Set the component numbers in the elements
-//   for (int k = 0; k < num_components; k++) {
-//     elements[k]->setComponentNum(k);
-//   }
+/*
+  Create a TACSToFH5 file creation object
+*/
+TACSToFH5 *TACSMeshLoader::createTACSToFH5(TACSAssembler *tacs,
+                                           ElementType elem_type,
+                                           int write_flag) {
+  // Set the component numbers in the elements
+  for (int k = 0; k < num_components; k++) {
+    elements[k]->setComponentNum(k);
+  }
 
-//   TACSToFH5 *f5 = new TACSToFH5(tacs, elem_type, write_flag);
-//   for (int k = 0; k < num_components; k++) {
-//     if (strlen(&component_descript[33 * k]) == 0) {
-//       char name[64];
-//       sprintf(name, "Component %d", k);
-//       f5->setComponentName(k, name);
-//     } else {
-//       f5->setComponentName(k, &component_descript[33 * k]);
-//     }
-//   }
+  TACSToFH5 *f5 = new TACSToFH5(tacs, elem_type, write_flag);
+  for (int k = 0; k < num_components; k++) {
+    if (strlen(&component_descript[33 * k]) == 0) {
+      char name[64];
+      sprintf(name, "Component %d", k);
+      f5->setComponentName(k, name);
+    } else {
+      f5->setComponentName(k, &component_descript[33 * k]);
+    }
+  }
 
-//   return f5;
-// }
-
-// /*
-//   Create a serial version of TACS
-// */
-// TACSAssembler *TACSMeshLoader::createTACS(
-//     int vars_per_node) {
-  
-//   TACSAssembler *assembler = new TACSAssembler(vars_per_node, num_elements);
-
-//   // TODO complete this step..
-//   // std::cout << std::flush;
-//   printf("Set element conn\n");
-//   assembler->setElementConnectivity(elem_node_ptr, elem_node_conn);
-//   printf("Set elements\n");
-//   std::cout << std::flush;
-//   assembler->setElements(elements);
-//   // assembler->addBCs();
-//   // assembler->initialize();
-//   // assembler->setNodes();
-
-//   return assembler;
-// }
+  return f5;
+}
 
 /*
   Create a distributed version of TACS
@@ -1201,6 +1151,76 @@ TACSAssembler *TACSMeshLoader::createTACS(
   Retrieve the number of elements owned by this processes
 */
 int TACSMeshLoader::getNumElements() { return num_elements; }
+
+/*
+  Set the function domain
+
+  Given the function, and the set of component numbers that define the
+  domain of interest, set the element numbers in the function that
+*/
+void TACSMeshLoader::addFunctionDomain(TACSFunction *function, int num_comps,
+                                       int comp_nums[]) {
+  if (creator) {
+    int *elems;
+    int num_elems = creator->getElementIdNums(num_comps, comp_nums, &elems);
+    function->addDomain(num_elems, elems);
+    delete[] elems;
+  }
+}
+
+/*
+  Add the auxiliary element to the given domain specified by the
+  component number
+*/
+void TACSMeshLoader::addAuxElement(TACSAuxElements *aux, int component_num,
+                                   TACSElement *element) {
+  if (creator) {
+    int *elems;
+    int num_elems = creator->getElementIdNums(1, &component_num, &elems);
+    for (int i = 0; i < num_elems; i++) {
+      aux->addElement(elems[i], element);
+    }
+    delete[] elems;
+  }
+}
+
+/**
+  Given node numbers from the original file on the root processor,
+  find the corresponding global node numbers in the given assembler object.
+
+  Note that the node numbers are assumed to be 1-based as is the case in the
+  original file format. In addition, the node array is over-written by a
+  temporary ordering. The number of nodes and their numbers are returned in
+  a newly allocated array.
+*/
+void TACSMeshLoader::getAssemblerNodeNums(TACSAssembler *assembler,
+                                          int num_nodes, int *node_nums,
+                                          int *num_new_nodes, int **new_nodes) {
+  *num_new_nodes = 0;
+  *new_nodes = NULL;
+
+  if (creator) {
+    int rank;
+    MPI_Comm_rank(comm, &rank);
+
+    int index = 0;
+    if (rank == 0) {
+      // Convert from the BDF order, to the local TACSMeshLoader order
+      for (int k = 0; k < num_nodes; k++) {
+        int node_num = node_nums[k] - 1;
+        int node = find_index_arg_sorted(node_num, num_nodes, file_node_nums,
+                                         node_arg_sort_list);
+        if (node >= 0) {
+          node_nums[index] = node;
+          index++;
+        }
+      }
+    }
+
+    creator->getAssemblerNodeNums(assembler, index, node_nums, num_new_nodes,
+                                  new_nodes);
+  }
+}
 
 /*
   Get the element connectivity and node locations

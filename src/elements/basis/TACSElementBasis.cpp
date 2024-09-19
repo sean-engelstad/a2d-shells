@@ -16,10 +16,23 @@
 
 #include "TACSElementAlgebra.h"
 
-// /*
-//   Get the layout type
-// */
-// ElementLayout TACSElementBasis::getLayoutType() { return TACS_LAYOUT_NONE; }
+/*
+  Get the layout type
+*/
+ElementLayout TACSElementBasis::getLayoutType() { return TACS_LAYOUT_NONE; }
+
+/*
+  Get the visualization parametric point
+*/
+void TACSElementBasis::getVisPoint(int n, double pt[]) {
+  if (getNumParameters() == 3) {
+    pt[0] = pt[1] = pt[2] = 0.0;
+  } else if (getNumParameters() == 2) {
+    pt[0] = pt[1] = 0.0;
+  } else {
+    pt[0] = 0.0;
+  }
+}
 
 TacsScalar TACSElementBasis::getFaceNormal(int face, int n,
                                            const TacsScalar Xpts[],
@@ -64,6 +77,80 @@ TacsScalar TACSElementBasis::getFaceNormal(int face, int n,
   return 0.0;
 }
 
+void TACSElementBasis::addFaceNormalXptSens(
+    int face, int n, const TacsScalar A, const TacsScalar Xd[],
+    const TacsScalar normal[], const TacsScalar dfdA, const TacsScalar dfdX[],
+    const TacsScalar dfdXd[], const TacsScalar dfdn[], TacsScalar dfdXpts[]) {
+  const int num_params = getNumParameters();
+
+  double pt[3];
+  double tangents[2 * 3];
+  getFaceQuadraturePoint(face, n, pt, tangents);
+
+  if (num_params == 3) {
+    TacsScalar Ainv = 1.0 / A;
+
+    // Compute dfda = 1.0/A*dfdn(I - (n*n^{T}))
+    TacsScalar dfda[3];
+    dfda[0] = Ainv * dfdn[0];
+    dfda[1] = Ainv * dfdn[1];
+    dfda[2] = Ainv * dfdn[2];
+    vec3Axpy(dfdA - Ainv * vec3Dot(normal, dfdn), normal, dfda);
+
+    // Compute the tangent directions
+    TacsScalar t1[3], t2[3];
+    mat3x3Mult(Xd, &tangents[0], t1);
+    mat3x3Mult(Xd, &tangents[3], t2);
+
+    TacsScalar dfdt1[3], dfdt2[3];
+    crossProduct(1.0, t2, dfda, dfdt1);
+    crossProduct(1.0, dfda, t1, dfdt2);
+
+    TacsScalar t[9];
+    if (dfdXd) {
+      memcpy(t, dfdXd, 9 * sizeof(TacsScalar));
+      vec3x3OuterAdd(1.0, dfdt1, &tangents[0], t);
+      vec3x3OuterAdd(1.0, dfdt2, &tangents[3], t);
+    } else {
+      vec3x3Outer(dfdt1, &tangents[0], t);
+      vec3x3OuterAdd(1.0, dfdt2, &tangents[3], t);
+    }
+
+    // Loop over the basis functions
+    addInterpFaceFieldsGradTranspose(face, n, pt, 3, t, dfdXpts);
+
+    if (dfdX) {
+      addInterpFaceFieldsTranspose(face, n, pt, 1, dfdX, 3, dfdXpts);
+    }
+  } else if (num_params == 2) {
+    TacsScalar Ainv = 1.0 / A;
+
+    TacsScalar dfda[2];
+    dfda[0] = Ainv * dfdn[0];
+    dfda[1] = Ainv * dfdn[1];
+    vec2Axpy(dfdA - Ainv * vec2Dot(normal, dfdn), normal, dfda);
+
+    TacsScalar dfdt[2];
+    dfdt[0] = -dfda[1];
+    dfdt[1] = dfda[0];
+
+    TacsScalar t[6] = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
+    if (dfdXd) {
+      memcpy(t, dfdXd, 6 * sizeof(TacsScalar));
+      vec2x2OuterAdd(1.0, dfdt, &tangents[0], t);
+    } else {
+      vec2x2Outer(dfdt, &tangents[0], t);
+    }
+
+    // Loop over the basis functions
+    addInterpFaceFieldsGradTranspose(face, n, pt, 3, t, dfdXpts);
+
+    if (dfdX) {
+      addInterpFaceFieldsTranspose(face, n, pt, 1, dfdX, 3, dfdXpts);
+    }
+  }
+}
+
 TacsScalar TACSElementBasis::getJacobianTransform(int n, const double pt[],
                                                   const TacsScalar Xpts[],
                                                   TacsScalar Xd[],
@@ -89,6 +176,75 @@ TacsScalar TACSElementBasis::getJacobianTransform(int n, const double pt[],
   }
 
   return 0.0;
+}
+
+void TACSElementBasis::addJacobianTransformXptSens(
+    int n, const double pt[], const TacsScalar Xd[], const TacsScalar J[],
+    TacsScalar dfddetXd, const TacsScalar dfdXd[], const TacsScalar dfdJ[],
+    TacsScalar dfdXpts[]) {
+  const int num_params = getNumParameters();
+
+  if (num_params == 3) {
+    // Compute t = d(detXd)/d(Xd)
+    TacsScalar t[9];
+    det3x3Sens(Xd, t);
+
+    // Multiply the derivative by df/d(detXd)
+    TacsScalar *T = t;
+    for (int i = 0; i < 9; i++, T++) {
+      T[0] *= dfddetXd;
+    }
+
+    // If dfdXd is supplied, add it to the derivative
+    if (dfdXd) {
+      for (int i = 0; i < 9; i++) {
+        t[i] += dfdXd[i];
+      }
+    }
+
+    // if df/d(J) is supplied, compute df/d(J)*d(J)/d(Xd) and add it
+    // to the array t
+    if (dfdJ) {
+      TacsScalar t2[9];
+      inv3x3Sens(J, dfdJ, t2);
+      for (int i = 0; i < 9; i++) {
+        t[i] += t2[i];
+      }
+    }
+
+    // Loop over each quadrature point for each basis function
+    addInterpFieldsGradTranspose(n, pt, 3, t, dfdXpts);
+  } else if (num_params == 2) {
+    // Compute t = d(detXd)/d(Xd)
+    TacsScalar t[6] = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
+    det2x2Sens(Xd, t);
+
+    // Multiply the derivative by df/d(detXd)
+    TacsScalar *T = t;
+    for (int i = 0; i < 4; i++, T++) {
+      T[0] *= dfddetXd;
+    }
+
+    // If dfdXd is supplied, add it to the derivative
+    if (dfdXd) {
+      for (int i = 0; i < 6; i++) {
+        t[i] += dfdXd[i];
+      }
+    }
+
+    // if df/d(J) is supplied, compute df/d(J)*d(J)/d(Xd) and add it
+    // to the array t
+    if (dfdJ) {
+      TacsScalar t2[4];
+      inv2x2Sens(J, dfdJ, t2);
+      for (int i = 0; i < 4; i++) {
+        t[i] += t2[i];
+      }
+    }
+
+    // Loop over each quadrature point for each basis function
+    addInterpFieldsGradTranspose(n, pt, 3, t, dfdXpts);
+  }
 }
 
 /*
@@ -246,6 +402,397 @@ TacsScalar TACSElementBasis::getFieldGradient(
   }
 
   return 0.0;
+}
+
+void TACSElementBasis::addFieldGradientSVSens(
+    int n, const double pt[], const TacsScalar Xpts[], const int vars_per_node,
+    const TacsScalar Xd[], const TacsScalar J[], const TacsScalar Ud[],
+    const TacsScalar dfdUt[], TacsScalar dfdUx[], TacsScalar dfdu[]) {
+  const int num_params = getNumParameters();
+
+  if (num_params == 3) {
+    for (int i = 0; i < vars_per_node; i++) {
+      TacsScalar jx[3];
+      mat3x3Mult(J, &dfdUx[3 * i], jx);
+      dfdUx[3 * i] = jx[0];
+      dfdUx[3 * i + 1] = jx[1];
+      dfdUx[3 * i + 2] = jx[2];
+    }
+  } else if (num_params == 2) {
+    for (int i = 0; i < vars_per_node; i++) {
+      TacsScalar jx[2];
+      mat2x2Mult(J, &dfdUx[2 * i], jx);
+      dfdUx[2 * i] = jx[0];
+      dfdUx[2 * i + 1] = jx[1];
+    }
+  } else {
+    for (int i = 0; i < vars_per_node; i++) {
+      dfdUx[i] *= J[0];
+    }
+  }
+
+  addInterpFieldsTranspose(n, pt, 3, &dfdUt[0], vars_per_node, dfdu);
+  addInterpFieldsTranspose(n, pt, 3, &dfdUt[1], vars_per_node, dfdu);
+  addInterpFieldsTranspose(n, pt, 3, &dfdUt[2], vars_per_node, dfdu);
+  addInterpFieldsGradTranspose(n, pt, vars_per_node, dfdUx, dfdu);
+}
+
+void TACSElementBasis::addFieldGradientXptSens(
+    int n, const double pt[], const TacsScalar Xpts[], const int vars_per_node,
+    const TacsScalar Xd[], const TacsScalar J[], const TacsScalar Ud[],
+    const TacsScalar dfddetXd, const TacsScalar dfdX[],
+    const TacsScalar dfdXd[], const TacsScalar dfdJ[], const TacsScalar dfdUx[],
+    TacsScalar dfdXpts[]) {
+  const int num_params = getNumParameters();
+
+  if (num_params == 3) {
+    // Compute t = d(detXd)/d(Xd)
+    TacsScalar t[9];
+    det3x3Sens(Xd, t);
+
+    // Multiply the derivative by df/d(detXd)
+    for (int i = 0; i < 9; i++) {
+      t[i] *= dfddetXd;
+    }
+
+    // If dfdXd is supplied, add it to the derivative
+    if (dfdXd) {
+      for (int i = 0; i < 9; i++) {
+        t[i] += dfdXd[i];
+      }
+    }
+
+    // if df/d(J) is supplied, compute df/d(J)*d(J)/d(Xd) and add it
+    // to the array t
+    if (dfdJ && dfdUx) {
+      // dfdJ = dfdUx*dUx/dJ, where dUx/dJ = Ud
+      TacsScalar df[9];
+      memcpy(df, dfdJ, 9 * sizeof(TacsScalar));
+      for (int k = 0; k < vars_per_node; k++) {
+        df[0] += Ud[3 * k] * dfdUx[3 * k];
+        df[1] += Ud[3 * k] * dfdUx[3 * k + 1];
+        df[2] += Ud[3 * k] * dfdUx[3 * k + 2];
+
+        df[3] += Ud[3 * k + 1] * dfdUx[3 * k];
+        df[4] += Ud[3 * k + 1] * dfdUx[3 * k + 1];
+        df[5] += Ud[3 * k + 1] * dfdUx[3 * k + 2];
+
+        df[6] += Ud[3 * k + 2] * dfdUx[3 * k];
+        df[7] += Ud[3 * k + 2] * dfdUx[3 * k + 1];
+        df[8] += Ud[3 * k + 2] * dfdUx[3 * k + 2];
+      }
+
+      TacsScalar t2[9];
+      inv3x3Sens(J, df, t2);
+      for (int i = 0; i < 9; i++) {
+        t[i] += t2[i];
+      }
+    } else if (dfdJ) {
+      TacsScalar t2[9];
+      inv3x3Sens(J, dfdJ, t2);
+      for (int i = 0; i < 9; i++) {
+        t[i] += t2[i];
+      }
+    } else if (dfdUx) {
+      // dfdJ = dfdUx*dUx/dJ, where dUx/dJ = Ud
+      TacsScalar df[9];
+      memset(df, 0, 9 * sizeof(TacsScalar));
+      for (int k = 0; k < vars_per_node; k++) {
+        df[0] += Ud[3 * k] * dfdUx[3 * k];
+        df[1] += Ud[3 * k] * dfdUx[3 * k + 1];
+        df[2] += Ud[3 * k] * dfdUx[3 * k + 2];
+
+        df[3] += Ud[3 * k + 1] * dfdUx[3 * k];
+        df[4] += Ud[3 * k + 1] * dfdUx[3 * k + 1];
+        df[5] += Ud[3 * k + 1] * dfdUx[3 * k + 2];
+
+        df[6] += Ud[3 * k + 2] * dfdUx[3 * k];
+        df[7] += Ud[3 * k + 2] * dfdUx[3 * k + 1];
+        df[8] += Ud[3 * k + 2] * dfdUx[3 * k + 2];
+      }
+
+      TacsScalar t2[9];
+      inv3x3Sens(J, df, t2);
+      for (int i = 0; i < 9; i++) {
+        t[i] += t2[i];
+      }
+    }
+
+    // Loop over the basis functions
+    addInterpFieldsGradTranspose(n, pt, 3, t, dfdXpts);
+
+    if (dfdX) {
+      addInterpFieldsTranspose(n, pt, 1, dfdX, 3, dfdXpts);
+    }
+  } else if (num_params == 2) {
+    // Compute t = d(detXd)/d(Xd)
+    TacsScalar t[6] = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
+    det2x2Sens(Xd, t);
+
+    // Multiply the derivative by df/d(detXd)
+    TacsScalar *T = t;
+    for (int i = 0; i < 4; i++, T++) {
+      T[0] *= dfddetXd;
+    }
+
+    // If dfdXd is supplied, add it to the derivative
+    if (dfdXd) {
+      for (int i = 0; i < 4; i++) {
+        t[i] += dfdXd[i];
+      }
+    }
+
+    // If df/d(J) is supplied, compute df/d(J)*d(J)/d(Xd) and add it
+    // to the array t
+    if (dfdJ && dfdUx) {
+      // dfdJ = dfdUx*dUx/dJ, where dUx/dJ = Ud
+      TacsScalar df[4];
+      memcpy(df, dfdJ, 4 * sizeof(TacsScalar));
+      for (int k = 0; k < vars_per_node; k++) {
+        df[0] += Ud[2 * k] * dfdUx[2 * k];
+        df[1] += Ud[2 * k] * dfdUx[2 * k + 1];
+
+        df[2] += Ud[2 * k + 1] * dfdUx[2 * k];
+        df[3] += Ud[2 * k + 1] * dfdUx[2 * k + 1];
+      }
+
+      TacsScalar t2[4];
+      inv2x2Sens(J, df, t2);
+      for (int i = 0; i < 4; i++) {
+        t[i] += t2[i];
+      }
+    } else if (dfdJ) {
+      TacsScalar t2[4];
+      inv2x2Sens(J, dfdJ, t2);
+      for (int i = 0; i < 4; i++) {
+        t[i] += t2[i];
+      }
+    } else if (dfdUx) {
+      TacsScalar df[4];
+      memset(df, 0, 4 * sizeof(TacsScalar));
+      for (int k = 0; k < vars_per_node; k++) {
+        df[0] += Ud[2 * k] * dfdUx[2 * k];
+        df[1] += Ud[2 * k] * dfdUx[2 * k + 1];
+
+        df[2] += Ud[2 * k + 1] * dfdUx[2 * k];
+        df[3] += Ud[2 * k + 1] * dfdUx[2 * k + 1];
+      }
+
+      TacsScalar t2[4];
+      inv2x2Sens(J, df, t2);
+      for (int i = 0; i < 4; i++) {
+        t[i] += t2[i];
+      }
+    }
+
+    // Loop over each basis function
+    addInterpFieldsGradTranspose(n, pt, 3, t, dfdXpts);
+
+    if (dfdX) {
+      addInterpFieldsTranspose(n, pt, 1, dfdX, 3, dfdXpts);
+    }
+  }
+}
+
+void TACSElementBasis::addFieldGradientXptSens(
+    int n, const double pt[], const TacsScalar Xpts[], const int vars_per_node,
+    const TacsScalar Xd[], const TacsScalar J[], const TacsScalar Ud[],
+    const TacsScalar Psid[], const TacsScalar dfddetXd, const TacsScalar dfdX[],
+    const TacsScalar dfdXd[], const TacsScalar dfdJ[], const TacsScalar dfdUx[],
+    const TacsScalar dfdPsix[], TacsScalar dfdXpts[]) {
+  const int num_params = getNumParameters();
+
+  if (num_params == 3) {
+    // Compute t = d(detXd)/d(Xd)
+    TacsScalar t[9];
+    det3x3Sens(Xd, t);
+
+    // Multiply the derivative by df/d(detXd)
+    for (int i = 0; i < 9; i++) {
+      t[i] *= dfddetXd;
+    }
+
+    // If dfdXd is supplied, add it to the derivative
+    if (dfdXd) {
+      for (int i = 0; i < 9; i++) {
+        t[i] += dfdXd[i];
+      }
+    }
+
+    // if df/d(J) is supplied, compute df/d(J)*d(J)/d(Xd) and add it
+    // to the array t
+    if (dfdJ && dfdUx && dfdPsix) {
+      // dfdJ = dfdUx*dUx/dJ, where dUx/dJ = Ud
+      TacsScalar df[9];
+      memcpy(df, dfdJ, 9 * sizeof(TacsScalar));
+      for (int k = 0; k < vars_per_node; k++) {
+        df[0] += Ud[3 * k] * dfdUx[3 * k];
+        df[1] += Ud[3 * k] * dfdUx[3 * k + 1];
+        df[2] += Ud[3 * k] * dfdUx[3 * k + 2];
+
+        df[3] += Ud[3 * k + 1] * dfdUx[3 * k];
+        df[4] += Ud[3 * k + 1] * dfdUx[3 * k + 1];
+        df[5] += Ud[3 * k + 1] * dfdUx[3 * k + 2];
+
+        df[6] += Ud[3 * k + 2] * dfdUx[3 * k];
+        df[7] += Ud[3 * k + 2] * dfdUx[3 * k + 1];
+        df[8] += Ud[3 * k + 2] * dfdUx[3 * k + 2];
+      }
+
+      for (int k = 0; k < vars_per_node; k++) {
+        df[0] += Psid[3 * k] * dfdPsix[3 * k];
+        df[1] += Psid[3 * k] * dfdPsix[3 * k + 1];
+        df[2] += Psid[3 * k] * dfdPsix[3 * k + 2];
+
+        df[3] += Psid[3 * k + 1] * dfdPsix[3 * k];
+        df[4] += Psid[3 * k + 1] * dfdPsix[3 * k + 1];
+        df[5] += Psid[3 * k + 1] * dfdPsix[3 * k + 2];
+
+        df[6] += Psid[3 * k + 2] * dfdPsix[3 * k];
+        df[7] += Psid[3 * k + 2] * dfdPsix[3 * k + 1];
+        df[8] += Psid[3 * k + 2] * dfdPsix[3 * k + 2];
+      }
+
+      TacsScalar t2[9];
+      inv3x3Sens(J, df, t2);
+      for (int i = 0; i < 9; i++) {
+        t[i] += t2[i];
+      }
+    } else if (dfdUx && dfdPsix) {
+      // dfdJ = dfdUx*dUx/dJ, where dUx/dJ = Ud
+      TacsScalar df[9];
+      memset(df, 0, 9 * sizeof(TacsScalar));
+      for (int k = 0; k < vars_per_node; k++) {
+        df[0] += Ud[3 * k] * dfdUx[3 * k];
+        df[1] += Ud[3 * k] * dfdUx[3 * k + 1];
+        df[2] += Ud[3 * k] * dfdUx[3 * k + 2];
+
+        df[3] += Ud[3 * k + 1] * dfdUx[3 * k];
+        df[4] += Ud[3 * k + 1] * dfdUx[3 * k + 1];
+        df[5] += Ud[3 * k + 1] * dfdUx[3 * k + 2];
+
+        df[6] += Ud[3 * k + 2] * dfdUx[3 * k];
+        df[7] += Ud[3 * k + 2] * dfdUx[3 * k + 1];
+        df[8] += Ud[3 * k + 2] * dfdUx[3 * k + 2];
+      }
+
+      for (int k = 0; k < vars_per_node; k++) {
+        df[0] += Psid[3 * k] * dfdPsix[3 * k];
+        df[1] += Psid[3 * k] * dfdPsix[3 * k + 1];
+        df[2] += Psid[3 * k] * dfdPsix[3 * k + 2];
+
+        df[3] += Psid[3 * k + 1] * dfdPsix[3 * k];
+        df[4] += Psid[3 * k + 1] * dfdPsix[3 * k + 1];
+        df[5] += Psid[3 * k + 1] * dfdPsix[3 * k + 2];
+
+        df[6] += Psid[3 * k + 2] * dfdPsix[3 * k];
+        df[7] += Psid[3 * k + 2] * dfdPsix[3 * k + 1];
+        df[8] += Psid[3 * k + 2] * dfdPsix[3 * k + 2];
+      }
+
+      TacsScalar t2[9];
+      inv3x3Sens(J, df, t2);
+      for (int i = 0; i < 9; i++) {
+        t[i] += t2[i];
+      }
+    } else if (dfdJ) {
+      TacsScalar t2[9];
+      inv3x3Sens(J, dfdJ, t2);
+      for (int i = 0; i < 9; i++) {
+        t[i] += t2[i];
+      }
+    }
+
+    // Loop over each basis function
+    addInterpFieldsGradTranspose(n, pt, 3, t, dfdXpts);
+
+    if (dfdX) {
+      addInterpFieldsTranspose(n, pt, 1, dfdX, 3, dfdXpts);
+    }
+  } else if (num_params == 2) {
+    // Compute t = d(detXd)/d(Xd)
+    TacsScalar t[6] = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
+    det2x2Sens(Xd, t);
+
+    // Multiply the derivative by df/d(detXd)
+    TacsScalar *T = t;
+    for (int i = 0; i < 4; i++, T++) {
+      T[0] *= dfddetXd;
+    }
+
+    // If dfdXd is supplied, add it to the derivative
+    if (dfdXd) {
+      for (int i = 0; i < 4; i++) {
+        t[i] += dfdXd[i];
+      }
+    }
+
+    // If df/d(J) is supplied, compute df/d(J)*d(J)/d(Xd) and add it
+    // to the array t
+    if (dfdJ && dfdUx && dfdPsix) {
+      // dfdJ = dfdUx*dUx/dJ, where dUx/dJ = Ud
+      TacsScalar df[4];
+      memcpy(df, dfdJ, 4 * sizeof(TacsScalar));
+      for (int k = 0; k < vars_per_node; k++) {
+        df[0] += Ud[2 * k] * dfdUx[2 * k];
+        df[1] += Ud[2 * k] * dfdUx[2 * k + 1];
+
+        df[2] += Ud[2 * k + 1] * dfdUx[2 * k];
+        df[3] += Ud[2 * k + 1] * dfdUx[2 * k + 1];
+      }
+
+      for (int k = 0; k < vars_per_node; k++) {
+        df[0] += Psid[2 * k] * dfdPsix[2 * k];
+        df[1] += Psid[2 * k] * dfdPsix[2 * k + 1];
+
+        df[2] += Psid[2 * k + 1] * dfdPsix[2 * k];
+        df[3] += Psid[2 * k + 1] * dfdPsix[2 * k + 1];
+      }
+
+      TacsScalar t2[4];
+      inv2x2Sens(J, df, t2);
+      for (int i = 0; i < 4; i++) {
+        t[i] += t2[i];
+      }
+    } else if (dfdUx && dfdPsix) {
+      TacsScalar df[4];
+      memset(df, 0, 4 * sizeof(TacsScalar));
+      for (int k = 0; k < vars_per_node; k++) {
+        df[0] += Ud[2 * k] * dfdUx[2 * k];
+        df[1] += Ud[2 * k] * dfdUx[2 * k + 1];
+
+        df[2] += Ud[2 * k + 1] * dfdUx[2 * k];
+        df[3] += Ud[2 * k + 1] * dfdUx[2 * k + 1];
+      }
+
+      for (int k = 0; k < vars_per_node; k++) {
+        df[0] += Psid[2 * k] * dfdPsix[2 * k];
+        df[1] += Psid[2 * k] * dfdPsix[2 * k + 1];
+
+        df[2] += Psid[2 * k + 1] * dfdPsix[2 * k];
+        df[3] += Psid[2 * k + 1] * dfdPsix[2 * k + 1];
+      }
+
+      TacsScalar t2[4];
+      inv2x2Sens(J, df, t2);
+      for (int i = 0; i < 4; i++) {
+        t[i] += t2[i];
+      }
+    } else if (dfdJ) {
+      TacsScalar t2[4];
+      inv2x2Sens(J, dfdJ, t2);
+      for (int i = 0; i < 4; i++) {
+        t[i] += t2[i];
+      }
+    }
+
+    // Loop over each basis function
+    addInterpFieldsGradTranspose(n, pt, 3, t, dfdXpts);
+
+    if (dfdX) {
+      addInterpFieldsTranspose(n, pt, 1, dfdX, 3, dfdXpts);
+    }
+  }
 }
 
 /*

@@ -39,7 +39,7 @@
 */
 
 // #include "TACSAuxElements.h"
-// #include "TACSCreator.h"
+#include "TACSCreator.h"
 // #include "TACSToFH5.h"
 #include "TACSObject.h"
 #include "TACSAssembler.h"
@@ -52,8 +52,8 @@ extern const int TacsMeshLoaderElementLimits[TacsMeshLoaderNumElementTypes][2];
 
 class TACSMeshLoader : public TACSObject {
  public:
-  // TACSMeshLoader(MPI_Comm _comm);
-  TACSMeshLoader();
+  TACSMeshLoader(MPI_Comm _comm);
+  // TACSMeshLoader();
   ~TACSMeshLoader();
 
   // Read a BDF file for input
@@ -68,7 +68,7 @@ class TACSMeshLoader : public TACSObject {
 
   // Set the elements corresponding to each of the component numbers
   // ---------------------------------------------------------------
-  // void setElement(int component_num, TACSElement *_element);
+  void setElement(int component_num, TACSElement *_element);
 
   // Retrieve the element numbers corresponding to the given
   // component numbers
@@ -83,12 +83,14 @@ class TACSMeshLoader : public TACSObject {
 
   // Distribute the mesh and create TACS
   // -----------------------------------
-  // TACSAssembler *createTACS(
-  //     int vars_per_node,
-  //     TACSAssembler::OrderingType order_type = TACSAssembler::NATURAL_ORDER,
-  //     TACSAssembler::MatrixOrderingType mat_type = TACSAssembler::DIRECT_SCHUR);
   TACSAssembler *createTACS(
-      int vars_per_node);
+      int vars_per_node,
+      TACSAssembler::OrderingType order_type = TACSAssembler::NATURAL_ORDER,
+      TACSAssembler::MatrixOrderingType mat_type = TACSAssembler::DIRECT_SCHUR);
+  
+  // serial version
+  // TACSAssembler *createTACS(
+      // int vars_per_node);
 
   // Set the domain of a structural function with component numbers
   // --------------------------------------------------------------
@@ -116,10 +118,10 @@ class TACSMeshLoader : public TACSObject {
 
  private:
   // Communicator for all processors
-  // MPI_Comm comm;
+  MPI_Comm comm;
 
   // The underlying creator object
-  // TACSCreator *creator;
+  TACSCreator *creator;
 
   // The element corresponding to each of the component numbers
   TACSElement **elements;

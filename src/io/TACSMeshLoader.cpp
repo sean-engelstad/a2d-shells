@@ -449,8 +449,8 @@ static int parse_element_field(size_t *loc, char *buffer,
   communicator for later use. Note that the file is only scanned on
   the root processor.
 */
-TACSMeshLoader::TACSMeshLoader() {
-  // comm = _comm;
+TACSMeshLoader::TACSMeshLoader(MPI_Comm _comm) {
+  comm = _comm;
 
   // Initialize everything to zero
   num_nodes = num_elements = 0;
@@ -472,7 +472,7 @@ TACSMeshLoader::TACSMeshLoader() {
   component_descript = NULL;
 
   // // Set the creator object to NULL
-  // creator = NULL;
+  creator = NULL;
 }
 
 /*
@@ -548,13 +548,13 @@ int TACSMeshLoader::getNumComponents() { return num_components; }
 /*
   Set the element associated with a given component number
 */
-// void TACSMeshLoader::setElement(int component_num, TACSElement *_element) {
-//   if (_element && (component_num >= 0) && (component_num < num_components)) {
-//     _element->incref();
-//     _element->setComponentNum(component_num);
-//     elements[component_num] = _element;
-//   }
-// }
+void TACSMeshLoader::setElement(int component_num, TACSElement *_element) {
+  if (_element && (component_num >= 0) && (component_num < num_components)) {
+    _element->incref();
+    _element->setComponentNum(component_num);
+    elements[component_num] = _element;
+  }
+}
 
 /*
   Get the component description from the file
@@ -586,7 +586,7 @@ const char *TACSMeshLoader::getElementDescript(int comp_num) {
 */
 int TACSMeshLoader::scanBDFFile(const char *file_name) {
   int rank = 0;
-  // MPI_Comm_rank(comm, &rank);
+  MPI_Comm_rank(comm, &rank);
   int fail = 0;
 
   // printf("Here\n");
@@ -983,10 +983,10 @@ int TACSMeshLoader::scanBDFFile(const char *file_name) {
     delete[] buffer;
     delete[] temp_nodes;
 
-    // if (fail) {
-    //   MPI_Abort(comm, fail);
-    //   return fail;
-    // }
+    if (fail) {
+      MPI_Abort(comm, fail);
+      return fail;
+    }
 
     // Arg sort the list of nodes
     node_arg_sort_list = new int[num_nodes];
@@ -1070,13 +1070,13 @@ int TACSMeshLoader::scanBDFFile(const char *file_name) {
   }
 
   // // Distribute the component numbers and descritpions
-  // MPI_Bcast(&num_components, 1, MPI_INT, root, comm);
-  // if (rank != root) {
-  //   component_elems = new char[9 * num_components];
-  //   component_descript = new char[33 * num_components];
-  // }
-  // MPI_Bcast(component_elems, 9 * num_components, MPI_CHAR, root, comm);
-  // MPI_Bcast(component_descript, 33 * num_components, MPI_CHAR, root, comm);
+  MPI_Bcast(&num_components, 1, MPI_INT, root, comm);
+  if (rank != root) {
+    component_elems = new char[9 * num_components];
+    component_descript = new char[33 * num_components];
+  }
+  MPI_Bcast(component_elems, 9 * num_components, MPI_CHAR, root, comm);
+  MPI_Bcast(component_descript, 33 * num_components, MPI_CHAR, root, comm);
 
   elements = new TACSElement *[num_components];
   for (int k = 0; k < num_components; k++) {
@@ -1117,25 +1117,84 @@ int TACSMeshLoader::getNumNodes() { return num_nodes; }
 // }
 
 // /*
-//   Create a distributed version of TACS
+//   Create a serial version of TACS
 // */
-TACSAssembler *TACSMeshLoader::createTACS(
-    int vars_per_node) {
+// TACSAssembler *TACSMeshLoader::createTACS(
+//     int vars_per_node) {
   
-  TACSAssembler *assembler = new TACSAssembler(vars_per_node, num_elements);
+//   TACSAssembler *assembler = new TACSAssembler(vars_per_node, num_elements);
 
-  // TODO complete this step..
-  // std::cout << std::flush;
-  printf("Set element conn\n");
-  assembler->setElementConnectivity(elem_node_ptr, elem_node_conn);
-  printf("Set elements\n");
-  std::cout << std::flush;
-  assembler->setElements(elements);
-  // assembler->addBCs();
-  // assembler->initialize();
-  // assembler->setNodes();
+//   // TODO complete this step..
+//   // std::cout << std::flush;
+//   printf("Set element conn\n");
+//   assembler->setElementConnectivity(elem_node_ptr, elem_node_conn);
+//   printf("Set elements\n");
+//   std::cout << std::flush;
+//   assembler->setElements(elements);
+//   // assembler->addBCs();
+//   // assembler->initialize();
+//   // assembler->setNodes();
 
-  return assembler;
+//   return assembler;
+// }
+
+/*
+  Create a distributed version of TACS
+*/
+TACSAssembler *TACSMeshLoader::createTACS(
+    int vars_per_node, TACSAssembler::OrderingType order_type,
+    TACSAssembler::MatrixOrderingType mat_type) {
+  // Set the root processor
+  const int root = 0;
+
+  // Get the rank of the current processor
+  int rank;
+  MPI_Comm_rank(comm, &rank);
+
+  // Allocate the TACS creator
+  creator = new TACSCreator(comm, vars_per_node);
+  creator->incref();
+
+  // Set the ordering type and matrix type
+  creator->setReorderingType(order_type, mat_type);
+
+  if (rank == root) {
+    // Set the connectivity
+    creator->setGlobalConnectivity(num_nodes, num_elements, elem_node_ptr,
+                                   elem_node_conn, elem_component);
+
+    // Set the boundary conditions
+    creator->setBoundaryConditions(num_bcs, bc_nodes, bc_ptr, bc_vars, bc_vals);
+
+    // Set the nodal locations
+    creator->setNodes(Xpts);
+
+    // Free things that are no longer required
+    delete[] elem_node_ptr;
+    elem_node_ptr = NULL;
+    delete[] elem_node_conn;
+    elem_node_conn = NULL;
+    delete[] elem_component;
+    elem_component = NULL;
+
+    // Free the boundary conditions
+    delete[] bc_nodes;
+    bc_nodes = NULL;
+    delete[] bc_ptr;
+    bc_ptr = NULL;
+    delete[] bc_vars;
+    bc_vars = NULL;
+    delete[] bc_vals;
+    bc_vals = NULL;
+  }
+
+  // This call must occur on all processor
+  creator->setElements(num_components, elements);
+
+  // Create the TACSAssembler object
+  TACSAssembler *tacs = creator->createTACS();
+
+  return tacs;
 }
 
 /*

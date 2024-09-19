@@ -5,3 +5,9 @@ exec = test_sym
 
 SO_LINK_FLAGS=-fPIC -shared
 A2D_SHELLS_DIR = ${HOME}/git/a2d-shells
+
+LAPACK_LIBS = -L/usr/lib/ -llapack -lpthread -lblas
+
+METIS_DIR = ${A2D_SHELLS_DIR}/extern/metis
+METIS_INCLUDE = -I${METIS_DIR}/include/
+METIS_LIB = ${METIS_DIR}/libmetis/libmetis.a

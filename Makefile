@@ -8,6 +8,8 @@ default: ${MY_OBJS}
 		echo; (cd $$subdir && $(MAKE)) || exit 1; \
 		done \
 
+	${CXX} ${SO_LINK_FLAGS} ${MY_OBJS} ${EXTERN_LIBS} -o ${A2D_SHELLS_DIR}/lib/liba2dshells.${SO_EXT}
+
 new:
 	$(MAKE) clean
 	$(MAKE) default
@@ -16,3 +18,4 @@ clean:
 	rm -f *.o
 	rm -f **/*.o
 	rm -f **/**/*.o
+	rm -f lib/*.so

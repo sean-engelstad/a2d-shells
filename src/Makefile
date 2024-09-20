@@ -10,15 +10,9 @@ include ../A2D_SHELLS.mk
 CXX_OBJS = TACSObject.o \
 	TacsUtilities.o \
 	TACSAssembler.o \
-	TACSAuxElements.o \
 	TACSCreator.o \
-	TACSMg.o \
-	TACSBuckling.o \
 	TACSAssembler_thread.o \
-	TACSIntegrator.o \
-	TACSMatrixFreeMat.o \
-	TACSContinuation.o \
-	TACSSpectralIntegrator.o
+	TACSMatrixFreeMat.o 
 
 DIR=${TACS_DIR}/src
 

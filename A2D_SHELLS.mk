@@ -10,7 +10,8 @@ TACS_INCLUDE = -I${TACS_DIR}/src \
 	-I${TACS_DIR}/src/elements/shell \
 	-I${TACS_DIR}/src/constitutive \
 	-I${TACS_DIR}/src/functions \
-	-I${TACS_DIR}/src/io
+	-I${TACS_DIR}/src/io \
+	-I${TACS_DIR}/src/utils
 
 # Set the command line flags to use for compilation
 TACS_OPT_CC_FLAGS = ${TACS_DEF} ${EXTRA_CC_FLAGS} ${METIS_INCLUDE} ${AMD_INCLUDE} ${TECIO_INCLUDE} ${TACS_INCLUDE}

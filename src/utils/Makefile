@@ -4,14 +4,13 @@
 #
 # ============================================
 
-include ../Makefile.in
-include ../A2D_SHELLS.mk
+include ../../Makefile.in
+include ../../A2D_SHELLS.mk
 
-CXX_OBJS = TACSAssembler.o \
-	TACSCreator.o \
-	TACSAssembler_thread.o
+CXX_OBJS = TACSObject.o \
+	TacsUtilities.o
 
-DIR=${TACS_DIR}/src
+DIR=${TACS_DIR}/src/utils
 
 CXX_OBJS := $(CXX_OBJS:%=$(DIR)/%)
 

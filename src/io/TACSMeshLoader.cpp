@@ -1168,22 +1168,6 @@ void TACSMeshLoader::addFunctionDomain(TACSFunction *function, int num_comps,
   }
 }
 
-/*
-  Add the auxiliary element to the given domain specified by the
-  component number
-*/
-void TACSMeshLoader::addAuxElement(TACSAuxElements *aux, int component_num,
-                                   TACSElement *element) {
-  if (creator) {
-    int *elems;
-    int num_elems = creator->getElementIdNums(1, &component_num, &elems);
-    for (int i = 0; i < num_elems; i++) {
-      aux->addElement(elems[i], element);
-    }
-    delete[] elems;
-  }
-}
-
 /**
   Given node numbers from the original file on the root processor,
   find the corresponding global node numbers in the given assembler object.

@@ -12,8 +12,7 @@ CXX_OBJS = TACSObject.o \
 	TACSAssembler.o \
 	TACSCreator.o \
 	TACSAssembler_thread.o \
-	TACSMatrixFreeMat.o \
-	TACSAuxElements.o
+	TACSMatrixFreeMat.o
 
 DIR=${TACS_DIR}/src
 

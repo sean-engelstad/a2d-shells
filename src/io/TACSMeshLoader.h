@@ -55,7 +55,6 @@ const int TacsMeshLoaderElementLimits[][2] = {{2, 2},    // CBAR
   in to the object based on the component number.
 */
 
-#include "TACSAuxElements.h"
 #include "TACSCreator.h"
 #include "TACSToFH5.h"
 
@@ -100,11 +99,6 @@ class TACSMeshLoader : public TACSObject {
   // --------------------------------------------------------------
   void addFunctionDomain(TACSFunction *function, int num_comps,
                          int comp_nums[]);
-
-  // Add the auxiliary element to the given component
-  // ------------------------------------------------
-  void addAuxElement(TACSAuxElements *aux, int component_num,
-                     TACSElement *_element);
 
   // Get the node numbers in the Assembler object from the file number
   // -----------------------------------------------------------------

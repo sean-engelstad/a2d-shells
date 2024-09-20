@@ -67,20 +67,6 @@ void *TACSAssembler::assembleRes_thread(void *t) {
   TacsScalar *elemRes = &data[3 * s];
   TacsScalar *elemXpts = &data[4 * s];
 
-  // Set the data for the auxiliary elements - if there are any
-  int naux = 0, aux_count = 0;
-  TACSAuxElem *aux = NULL;
-  if (assembler->auxElements) {
-    naux = assembler->auxElements->getAuxElements(&aux);
-  }
-  // To avoid allocating memory inside the element loop, make the aux element
-  // contribution array big enough for the largest element
-  TacsScalar *auxElemRes;
-  bool scaleAux = lambda != TacsScalar(1.0) && naux > 0;
-  if (scaleAux) {
-    auxElemRes = new TacsScalar[s];
-  }
-
   while (assembler->numCompletedElements < assembler->numElements) {
     int elemIndex = -1;
     TACSAssembler::schedPthreadJob(assembler, &elemIndex,
@@ -103,41 +89,11 @@ void *TACSAssembler::assembleRes_thread(void *t) {
       element->addResidual(elemIndex, assembler->time, elemXpts, vars, dvars,
                            ddvars, elemRes);
 
-      // Increment the aux counter until we possibly have
-      // aux[aux_count].num == elemIndex
-      while (aux_count < naux && aux[aux_count].num < elemIndex) {
-        aux_count++;
-      }
-
-      // Add the residual from any auxiliary elements, if the load factor is 1
-      // they can be added straight to the elemRes, otherwise they need to be
-      // scaled first
-      if (!scaleAux) {
-        while (aux_count < naux && aux[aux_count].num == elemIndex) {
-          aux[aux_count].elem->addResidual(elemIndex, assembler->time, elemXpts,
-                                           vars, dvars, ddvars, elemRes);
-          aux_count++;
-        }
-      } else {
-        memset(auxElemRes, 0, s * sizeof(TacsScalar));
-        while (aux_count < naux && aux[aux_count].num == elemIndex) {
-          aux[aux_count].elem->addResidual(elemIndex, assembler->time, elemXpts,
-                                           vars, dvars, ddvars, auxElemRes);
-          aux_count++;
-        }
-        for (int jj = 0; jj < s; jj++) {
-          elemRes[jj] += lambda * auxElemRes[jj];
-        }
-      }
-
       // Add the values to the residual when the memory unlocks
       pthread_mutex_lock(&assembler->tacs_mutex);
       res->setValues(len, nodes, elemRes, TACS_ADD_VALUES);
       pthread_mutex_unlock(&assembler->tacs_mutex);
     }
-  }
-  if (scaleAux) {
-    delete[] auxElemRes;
   }
   delete[] data;
 
@@ -184,13 +140,6 @@ void *TACSAssembler::assembleJacobian_thread(void *t) {
   TacsScalar *elemWeights = &data[4 * s + sx];
   TacsScalar *elemMat = &data[4 * s + sx + sw];
 
-  // Set the data for the auxiliary elements - if there are any
-  int naux = 0, aux_count = 0;
-  TACSAuxElem *aux = NULL;
-  if (assembler->auxElements) {
-    naux = assembler->auxElements->getAuxElements(&aux);
-  }
-
   while (assembler->numCompletedElements < assembler->numElements) {
     int elemIndex = -1;
     TACSAssembler::schedPthreadJob(assembler, &elemIndex,
@@ -217,20 +166,6 @@ void *TACSAssembler::assembleJacobian_thread(void *t) {
       // Generate the Jacobian of the element
       element->addJacobian(elemIndex, assembler->time, alpha, beta, gamma,
                            elemXpts, vars, dvars, ddvars, elemRes, elemMat);
-
-      // Increment the aux counter until we possibly have
-      // aux[aux_count].num == elemIndex
-      while (aux_count < naux && aux[aux_count].num < elemIndex) {
-        aux_count++;
-      }
-
-      // Add the residual from the auxiliary elements
-      while (aux_count < naux && aux[aux_count].num == elemIndex) {
-        aux[aux_count].elem->addJacobian(
-            elemIndex, assembler->time, alpha * lambda, beta * lambda,
-            gamma * lambda, elemXpts, vars, dvars, ddvars, elemRes, elemMat);
-        aux_count++;
-      }
 
       pthread_mutex_lock(&assembler->tacs_mutex);
       // Add values to the residual
@@ -284,18 +219,6 @@ void *TACSAssembler::assembleMatType_thread(void *t) {
   TacsScalar *elemWeights = &data[s + sx];
   TacsScalar *elemMat = &data[s + sx + sw];
 
-  // Set the data for the auxiliary elements - if there are any
-  int naux = 0, aux_count = 0;
-  TACSAuxElem *aux = NULL;
-  if (assembler->auxElements) {
-    naux = assembler->auxElements->getAuxElements(&aux);
-  }
-  TacsScalar *auxElemMat;
-  bool scaleAux = lambda != TacsScalar(1.0) && naux > 0;
-  if (scaleAux) {
-    auxElemMat = new TacsScalar[s * s];
-  }
-
   while (assembler->numCompletedElements < assembler->numElements) {
     int elemIndex = -1;
     TACSAssembler::schedPthreadJob(assembler, &elemIndex,
@@ -317,41 +240,11 @@ void *TACSAssembler::assembleMatType_thread(void *t) {
       element->getMatType(matType, elemIndex, assembler->time, elemXpts, vars,
                           elemMat);
 
-      // Increment the aux counter until we possibly have
-      // aux[aux_count].num == elemIndex
-      while (aux_count < naux && aux[aux_count].num < elemIndex) {
-        aux_count++;
-      }
-
-      // Add the contribution from any auxiliary elements, if the load factor is
-      // 1 they can be added straight to the elemRes, otherwise they need to be
-      // scaled first
-      if (!scaleAux) {
-        while (aux_count < naux && aux[aux_count].num == elemIndex) {
-          aux[aux_count].elem->getMatType(matType, elemIndex, assembler->time,
-                                          elemXpts, vars, elemMat);
-          aux_count++;
-        }
-      } else {
-        memset(auxElemMat, 0, s * s * sizeof(TacsScalar));
-        while (aux_count < naux && aux[aux_count].num == elemIndex) {
-          aux[aux_count].elem->getMatType(matType, elemIndex, assembler->time,
-                                          elemXpts, vars, auxElemMat);
-          aux_count++;
-        }
-        for (int ii = 0; ii < s * s; ii++) {
-          elemMat[ii] += lambda * auxElemMat[ii];
-        }
-      }
-
       pthread_mutex_lock(&assembler->tacs_mutex);
       // Add values to the matrix
       assembler->addMatValues(A, elemIndex, elemMat, idata, elemWeights, matOr);
       pthread_mutex_unlock(&assembler->tacs_mutex);
     }
-  }
-  if (scaleAux) {
-    delete[] auxElemMat;
   }
   delete[] data;
 

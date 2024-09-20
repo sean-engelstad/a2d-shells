@@ -27,7 +27,6 @@
 class TACSAssembler;
 
 // Basic analysis classes
-#include "TACSAuxElements.h"
 #include "TACSElement.h"
 #include "TACSFunction.h"
 #include "TACSObject.h"
@@ -151,11 +150,6 @@ class TACSAssembler : public TACSObject {
   int getMaxElementNodes();
   int getMaxElementVariables();
   int getMaxElementDesignVars();
-
-  // Set auxiliary elements into the TACSAssembler object
-  // ----------------------------------------------------
-  void setAuxElements(TACSAuxElements *aux_elems);
-  TACSAuxElements *getAuxElements();
 
   // Set the nodes in TACS
   // ---------------------
@@ -415,9 +409,6 @@ class TACSAssembler : public TACSObject {
 
   // The local list of elements
   TACSElement **elements;
-
-  // The auxiliary element class
-  TACSAuxElements *auxElements;
 
   // The variables, velocities and accelerations
   TACSBVec *varsVec, *dvarsVec, *ddvarsVec;

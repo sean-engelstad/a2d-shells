@@ -7,19 +7,7 @@
 include ../../../Makefile.in
 include ../../../A2D_SHELLS.mk
 
-CXX_OBJS = TACSElementBasis.o \
-	TACSLineBasis.o \
-	TACSQuadBasis.o \
-	TACSHexaBasis.o \
-	TACSTensorProductBasisImpl.o \
-	TACSTriangularBasis.o \
-	TACSTetrahedralBasis.o \
-	TACSQuadBernsteinBasis.o \
-	TACSHexaBernsteinBasis.o \
-	TACSElementMappedBasis.o \
-	TACSBeamBasis.o \
-	TACSMITCBasis.o \
-	TACSMITCQuadBasis.o
+CXX_OBJS = TACSElementBasis.o
 
 DIR=${TACS_DIR}/src/elements/basis
 

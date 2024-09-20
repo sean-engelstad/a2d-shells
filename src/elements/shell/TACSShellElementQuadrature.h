@@ -5,7 +5,7 @@
 #include "TACSElementTypes.h"
 #include "TACSGaussQuadrature.h"
 #include "TACSLagrangeInterpolation.h"
-#include "TACSTriangleQuadrature.h"
+// #include "TACSTriangleQuadrature.h"
 
 /**
   Defines the quadrature over both the face and quadrature
@@ -157,96 +157,96 @@ class TACSQuadCubicQuadrature {
   }
 };
 
-class TACSTriLinearQuadrature {
- public:
-  static const int NUM_QUADRATURE_POINTS = 3;
+// class TACSTriLinearQuadrature {
+//  public:
+//   static const int NUM_QUADRATURE_POINTS = 3;
 
-  static int getNumParameters() { return 2; }
-  static int getNumQuadraturePoints() { return 3; }
-  static double getQuadratureWeight(int n) { return TacsTriangleWts3[n]; }
-  static double getQuadraturePoint(int n, double pt[]) {
-    pt[0] = TacsTrianglePts3[2 * n];
-    pt[1] = TacsTrianglePts3[2 * n + 1];
+//   static int getNumParameters() { return 2; }
+//   static int getNumQuadraturePoints() { return 3; }
+//   static double getQuadratureWeight(int n) { return TacsTriangleWts3[n]; }
+//   static double getQuadraturePoint(int n, double pt[]) {
+//     pt[0] = TacsTrianglePts3[2 * n];
+//     pt[1] = TacsTrianglePts3[2 * n + 1];
 
-    return TacsTriangleWts3[n];
-  }
-  static int getNumElementFaces() { return 3; }
-  static int getNumFaceQuadraturePoints(int face) { return 2; }
-  static double getFaceQuadraturePoint(int face, int n, double pt[],
-                                       double t[]) {
-    if (face == 0) {
-      t[0] = 1.0;
-      t[1] = 0.0;
-    } else if (face == 1) {
-      t[0] = -1.0;
-      t[1] = 1.0;
-    } else if (face == 2) {
-      t[0] = 0.0;
-      t[1] = 1.0;
-    }
+//     return TacsTriangleWts3[n];
+//   }
+//   static int getNumElementFaces() { return 3; }
+//   static int getNumFaceQuadraturePoints(int face) { return 2; }
+//   static double getFaceQuadraturePoint(int face, int n, double pt[],
+//                                        double t[]) {
+//     if (face == 0) {
+//       t[0] = 1.0;
+//       t[1] = 0.0;
+//     } else if (face == 1) {
+//       t[0] = -1.0;
+//       t[1] = 1.0;
+//     } else if (face == 2) {
+//       t[0] = 0.0;
+//       t[1] = 1.0;
+//     }
 
-    if (face == 0) {
-      pt[0] = 0.5 * TacsGaussQuadPts2[n] + 0.5;
-      pt[1] = 0.0;
-      return 0.5 * TacsGaussQuadWts2[n];
-    } else if (face == 2) {
-      pt[0] = 0.0;
-      pt[1] = 0.5 * TacsGaussQuadPts2[n] + 0.5;
-      return 0.5 * TacsGaussQuadWts2[n];
-    } else if (face == 1) {
-      pt[0] = 1.0 - (0.5 * TacsGaussQuadPts2[n] + 0.5);
-      pt[1] = 0.5 * TacsGaussQuadPts2[n] + 0.5;
-      return 0.5 * sqrt(2.0) * TacsGaussQuadWts2[n];
-    }
+//     if (face == 0) {
+//       pt[0] = 0.5 * TacsGaussQuadPts2[n] + 0.5;
+//       pt[1] = 0.0;
+//       return 0.5 * TacsGaussQuadWts2[n];
+//     } else if (face == 2) {
+//       pt[0] = 0.0;
+//       pt[1] = 0.5 * TacsGaussQuadPts2[n] + 0.5;
+//       return 0.5 * TacsGaussQuadWts2[n];
+//     } else if (face == 1) {
+//       pt[0] = 1.0 - (0.5 * TacsGaussQuadPts2[n] + 0.5);
+//       pt[1] = 0.5 * TacsGaussQuadPts2[n] + 0.5;
+//       return 0.5 * sqrt(2.0) * TacsGaussQuadWts2[n];
+//     }
 
-    return 0.0;
-  }
-};
+//     return 0.0;
+//   }
+// };
 
-class TACSTriQuadraticQuadrature {
- public:
-  static const int NUM_QUADRATURE_POINTS = 6;
+// class TACSTriQuadraticQuadrature {
+//  public:
+//   static const int NUM_QUADRATURE_POINTS = 6;
 
-  static int getNumParameters() { return 2; }
-  static int getNumQuadraturePoints() { return 4; }
-  static double getQuadratureWeight(int n) { return TacsTriangleWts4[n]; }
-  static double getQuadraturePoint(int n, double pt[]) {
-    pt[0] = TacsTrianglePts4[2 * n];
-    pt[1] = TacsTrianglePts4[2 * n + 1];
+//   static int getNumParameters() { return 2; }
+//   static int getNumQuadraturePoints() { return 4; }
+//   static double getQuadratureWeight(int n) { return TacsTriangleWts4[n]; }
+//   static double getQuadraturePoint(int n, double pt[]) {
+//     pt[0] = TacsTrianglePts4[2 * n];
+//     pt[1] = TacsTrianglePts4[2 * n + 1];
 
-    return TacsTriangleWts4[n];
-  }
-  static int getNumElementFaces() { return 3; }
-  static int getNumFaceQuadraturePoints(int face) { return 2; }
-  static double getFaceQuadraturePoint(int face, int n, double pt[],
-                                       double t[]) {
-    if (face == 0) {
-      t[0] = 1.0;
-      t[1] = 0.0;
-    } else if (face == 1) {
-      t[0] = -1.0;
-      t[1] = 1.0;
-    } else if (face == 2) {
-      t[0] = 0.0;
-      t[1] = 1.0;
-    }
+//     return TacsTriangleWts4[n];
+//   }
+//   static int getNumElementFaces() { return 3; }
+//   static int getNumFaceQuadraturePoints(int face) { return 2; }
+//   static double getFaceQuadraturePoint(int face, int n, double pt[],
+//                                        double t[]) {
+//     if (face == 0) {
+//       t[0] = 1.0;
+//       t[1] = 0.0;
+//     } else if (face == 1) {
+//       t[0] = -1.0;
+//       t[1] = 1.0;
+//     } else if (face == 2) {
+//       t[0] = 0.0;
+//       t[1] = 1.0;
+//     }
 
-    if (face == 0) {
-      pt[0] = 0.5 * TacsGaussQuadPts2[n] + 0.5;
-      pt[1] = 0.0;
-      return 0.5 * TacsGaussQuadWts2[n];
-    } else if (face == 2) {
-      pt[0] = 0.0;
-      pt[1] = 0.5 * TacsGaussQuadPts2[n] + 0.5;
-      return 0.5 * TacsGaussQuadWts2[n];
-    } else if (face == 1) {
-      pt[0] = 1.0 - (0.5 * TacsGaussQuadPts2[n] + 0.5);
-      pt[1] = 0.5 * TacsGaussQuadPts2[n] + 0.5;
-      return 0.5 * sqrt(2.0) * TacsGaussQuadWts2[n];
-    }
+//     if (face == 0) {
+//       pt[0] = 0.5 * TacsGaussQuadPts2[n] + 0.5;
+//       pt[1] = 0.0;
+//       return 0.5 * TacsGaussQuadWts2[n];
+//     } else if (face == 2) {
+//       pt[0] = 0.0;
+//       pt[1] = 0.5 * TacsGaussQuadPts2[n] + 0.5;
+//       return 0.5 * TacsGaussQuadWts2[n];
+//     } else if (face == 1) {
+//       pt[0] = 1.0 - (0.5 * TacsGaussQuadPts2[n] + 0.5);
+//       pt[1] = 0.5 * TacsGaussQuadPts2[n] + 0.5;
+//       return 0.5 * sqrt(2.0) * TacsGaussQuadWts2[n];
+//     }
 
-    return 0.0;
-  }
-};
+//     return 0.0;
+//   }
+// };
 
 #endif  // TACS_SHELL_ELEMENT_QUADRATURE_H

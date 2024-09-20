@@ -5,6 +5,10 @@
 #include "TACSElementVerification.h"
 #include "TACSShellConstitutive.h"
 
+// slight change of import here otherwise
+// enum TacsShellTyingStrainComponent not defined
+#include "TACSShellElementQuadBasis.h"
+
 class TACSShellLinearModel {
  public:
   /**

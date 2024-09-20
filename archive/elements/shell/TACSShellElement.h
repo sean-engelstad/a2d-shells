@@ -6,9 +6,14 @@
 #include "TACSElementAlgebra.h"
 #include "TACSElementTypes.h"
 #include "TACSElementVerification.h"
+#include "TACSShellCentrifugalForce.h"
 #include "TACSShellConstitutive.h"
 #include "TACSShellElementModel.h"
 #include "TACSShellElementTransform.h"
+#include "TACSShellInertialForce.h"
+#include "TACSShellInplaneElementModel.h"
+#include "TACSShellPressure.h"
+#include "TACSShellTraction.h"
 #include "TACSShellUtilities.h"
 
 template <class quadrature, class basis, class director, class model>
@@ -46,6 +51,10 @@ class TACSShellElement : public TACSElement {
     if (typeid(model) == typeid(TACSShellLinearModel)) {
       nlElem = new TACSShellElement<quadrature, basis, director,
                                     TACSShellNonlinearModel>(transform, con);
+    } else if (typeid(model) == typeid(TACSShellInplaneLinearModel)) {
+      nlElem =
+          new TACSShellElement<quadrature, basis, director,
+                               TACSShellInplaneNonlinearModel>(transform, con);
     }
     // For nonlinear models we can use the current class instance
     else {
@@ -124,6 +133,26 @@ class TACSShellElement : public TACSElement {
   int getDesignVarRange(int elemIndex, int dvLen, TacsScalar lb[],
                         TacsScalar ub[]) {
     return con->getDesignVarRange(elemIndex, dvLen, lb, ub);
+  }
+
+  TACSElement *createElementTraction(int faceIndex, const TacsScalar t[]) {
+    return new TACSShellTraction<vars_per_node, quadrature, basis>(t);
+  }
+
+  TACSElement *createElementPressure(int faceIndex, TacsScalar p) {
+    return new TACSShellPressure<vars_per_node, quadrature, basis>(p);
+  }
+
+  TACSElement *createElementInertialForce(const TacsScalar inertiaVec[]) {
+    return new TACSShellInertialForce<vars_per_node, quadrature, basis>(
+        con, inertiaVec);
+  }
+
+  TACSElement *createElementCentrifugalForce(const TacsScalar omega[],
+                                             const TacsScalar rotCenter[],
+                                             const bool first_order = false) {
+    return new TACSShellCentrifugalForce<vars_per_node, quadrature, basis>(
+        con, omega, rotCenter, first_order);
   }
 
   void computeEnergies(int elemIndex, double time, const TacsScalar Xpts[],

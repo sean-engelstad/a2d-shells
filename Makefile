@@ -10,9 +10,7 @@ include A2D_SHELLS.mk
 TACS_SUBDIRS = src \
 	src/bpmat \
 	src/elements \
-	src/elements/dynamics \
 	src/elements/basis \
-	src/elements/shell \
 	src/constitutive \
 	src/io \
 	src/utils

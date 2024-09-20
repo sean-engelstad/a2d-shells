@@ -1,7 +1,10 @@
 include ../../Makefile.in
 include ../../A2D_SHELLS.mk
 
-default: RunCRM.o runcrm
+default: LoadMesh.o loadmesh RunCRM.o runcrm
+
+loadmesh:
+	${CXX} -o loadmesh.x LoadMesh.o ${TACS_LD_FLAGS}
 
 runcrm:
 	${CXX} -o runcrm.x RunCRM.o ${TACS_LD_FLAGS}

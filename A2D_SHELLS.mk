@@ -4,7 +4,6 @@ TACS_LIB = ${TACS_DIR}/lib/liba2dshells.a
 TACS_INCLUDE = -I${TACS_DIR}/src \
 	-I${TACS_DIR}/src/bpmat \
 	-I${TACS_DIR}/src/elements \
-	-I${TACS_DIR}/src/elements/a2d \
 	-I${TACS_DIR}/src/elements/basis \
 	-I${TACS_DIR}/src/elements/shell \
 	-I${TACS_DIR}/src/constitutive \

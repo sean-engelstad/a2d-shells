@@ -28,7 +28,6 @@ class TACSAssembler;
 
 // Basic analysis classes
 #include "TACSElement.h"
-#include "TACSFunction.h"
 #include "TACSObject.h"
 
 // Linear algebra classes
@@ -236,15 +235,6 @@ class TACSAssembler : public TACSObject {
   void setDesignVars(TACSBVec *dvs);
   void getDesignVarRange(TACSBVec *lb, TACSBVec *ub);
 
-  // Function and sensitivity evaluation
-  // -----------------------------------
-  void evalFunctions(int numFuncs, TACSFunction **funcs, TacsScalar *funcVals);
-
-  // Advanced function interface - for time integration
-  // --------------------------------------------------
-  void integrateFunctions(TacsScalar tcoef, TACSFunction::EvaluationType ftype,
-                          int numFuncs, TACSFunction **funcs);
-
   // Return elements and node numbers
   // --------------------------------
   TACSElement **getElements();
@@ -409,10 +399,6 @@ class TACSAssembler : public TACSObject {
       lambda = 1.0;
       matType = TACS_STIFFNESS_MATRIX;
       matOr = TACS_MAT_NORMAL;
-      coef = 0.0;
-      numFuncs = 0;
-      functions = NULL;
-      ftype = TACSFunction::INTEGRATE;
       numDesignVars = 0;
     }
 
@@ -428,12 +414,6 @@ class TACSAssembler : public TACSObject {
     TacsScalar alpha, beta, gamma, lambda;
     ElementMatrixType matType;
     MatrixOrientation matOr;
-
-    // Information required for the computation of f or df/dx
-    double coef;
-    int numFuncs;
-    TACSFunction **functions;
-    TACSFunction::EvaluationType ftype;
 
     int numDesignVars;
   } * tacsPInfo;

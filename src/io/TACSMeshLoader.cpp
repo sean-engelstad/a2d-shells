@@ -1152,22 +1152,6 @@ TACSAssembler *TACSMeshLoader::createTACS(
 */
 int TACSMeshLoader::getNumElements() { return num_elements; }
 
-/*
-  Set the function domain
-
-  Given the function, and the set of component numbers that define the
-  domain of interest, set the element numbers in the function that
-*/
-void TACSMeshLoader::addFunctionDomain(TACSFunction *function, int num_comps,
-                                       int comp_nums[]) {
-  if (creator) {
-    int *elems;
-    int num_elems = creator->getElementIdNums(num_comps, comp_nums, &elems);
-    function->addDomain(num_elems, elems);
-    delete[] elems;
-  }
-}
-
 /**
   Given node numbers from the original file on the root processor,
   find the corresponding global node numbers in the given assembler object.

@@ -229,19 +229,6 @@ class TACSAssembler : public TACSObject {
                              MatrixOrientation matOr = TACS_MAT_NORMAL,
                              const TacsScalar lambda = 1.0);
 
-  // Assemble data for and compute matrix-free matrix-vector products
-  // ----------------------------------------------------------------
-  void getMatrixFreeDataSize(ElementMatrixType matType, int *_data_size,
-                             int *_temp_size);
-  void assembleMatrixFreeData(ElementMatrixType matType, TacsScalar alpha,
-                              TacsScalar beta, TacsScalar gamma,
-                              TacsScalar data[]);
-  void addMatrixFreeVecProduct(ElementMatrixType matType,
-                               const TacsScalar data[], TacsScalar temp[],
-                               TACSBVec *x, TACSBVec *y,
-                               MatrixOrientation matOr = TACS_MAT_NORMAL,
-                               const TacsScalar lambda = 1.0);
-
   // Design variable handling
   // ------------------------
   TACSBVec *createDesignVec();
@@ -253,35 +240,10 @@ class TACSAssembler : public TACSObject {
   // -----------------------------------
   void evalFunctions(int numFuncs, TACSFunction **funcs, TacsScalar *funcVals);
 
-  // Steady or unsteady derivative evaluation
-  // ----------------------------------------
-  void addDVSens(TacsScalar coef, int numFuncs, TACSFunction **funcs,
-                 TACSBVec **dfdx);
-  void addSVSens(TacsScalar alpha, TacsScalar beta, TacsScalar gamma,
-                 int numFuncs, TACSFunction **funcs, TACSBVec **dfdu);
-  void addAdjointResProducts(TacsScalar scale, int numAdjoints,
-                             TACSBVec **adjoint, TACSBVec **dfdx,
-                             const TacsScalar lambda = 1.0);
-  void addXptSens(TacsScalar coef, int numFuncs, TACSFunction **funcs,
-                  TACSBVec **dfdXpts);
-  void addAdjointResXptSensProducts(TacsScalar scale, int numAdjoints,
-                                    TACSBVec **adjoint, TACSBVec **dfdXpts,
-                                    const TacsScalar lambda = 1.0);
-
   // Advanced function interface - for time integration
   // --------------------------------------------------
   void integrateFunctions(TacsScalar tcoef, TACSFunction::EvaluationType ftype,
                           int numFuncs, TACSFunction **funcs);
-
-  // Add the derivatives of inner products
-  // -------------------------------------
-  void addMatDVSensInnerProduct(TacsScalar scale, ElementMatrixType matType,
-                                TACSBVec *psi, TACSBVec *phi, TACSBVec *dfdx);
-  void addMatXptSensInnerProduct(TacsScalar scale, ElementMatrixType matType,
-                                 TACSBVec *psi, TACSBVec *phi,
-                                 TACSBVec *dfdXpts);
-  void evalMatSVSensInnerProduct(ElementMatrixType matType, TACSBVec *psi,
-                                 TACSBVec *phi, TACSBVec *res);
 
   // Return elements and node numbers
   // --------------------------------
@@ -290,12 +252,6 @@ class TACSAssembler : public TACSObject {
                           TacsScalar *vars = NULL, TacsScalar *dvars = NULL,
                           TacsScalar *ddvars = NULL);
   TACSElement *getElement(int elem, int *len, const int **nodes);
-
-  // Test the given element, constitutive or function class
-  // ------------------------------------------------------
-  void testElement(int elemNum, int print_level, double dh = 1e-6,
-                   double rtol = 1e-8, double atol = 1e-1);
-  void testFunction(TACSFunction *func, double dh);
 
   // Set the number of threads to work with
   // --------------------------------------
@@ -458,10 +414,6 @@ class TACSAssembler : public TACSObject {
       functions = NULL;
       ftype = TACSFunction::INTEGRATE;
       numDesignVars = 0;
-      numAdjoints = 0;
-      fdvSens = NULL;
-      fXptSens = NULL;
-      adjoints = NULL;
     }
 
     // The data required to perform most of the matrix
@@ -484,12 +436,6 @@ class TACSAssembler : public TACSObject {
     TACSFunction::EvaluationType ftype;
 
     int numDesignVars;
-    TacsScalar *fdvSens;  // df/dx
-    TACSBVec **fXptSens;
-
-    // Information for adjoint-dR/dx products
-    int numAdjoints;
-    TACSBVec **adjoints;
   } * tacsPInfo;
 
   // The pthread data required to pthread tacs operations

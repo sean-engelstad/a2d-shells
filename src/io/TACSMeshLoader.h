@@ -16,9 +16,26 @@
   http://www.apache.org/licenses/LICENSE-2.0
 */
 
-// #ifndef TACS_MESH_LOADER_H
-// #define TACS_MESH_LOADER_H
-#pragma once
+#ifndef TACS_MESH_LOADER_H
+#define TACS_MESH_LOADER_H
+
+const int TacsMeshLoaderNumElementTypes = 10;
+
+const char *TacsMeshLoaderElementTypes[] = {
+    "CBAR",  "CQUADR",  "CQUAD4", "CQUAD8", "CQUAD9",
+    "CQUAD", "CHEXA27", "CHEXA",  "CTRIA3", "CTETRA"};
+
+// Lower and upper limits for the number of nodes
+const int TacsMeshLoaderElementLimits[][2] = {{2, 2},    // CBAR
+                                              {4, 4},    // CQUADR
+                                              {4, 4},    // CQUAD4
+                                              {8, 8},    // CQUAD8
+                                              {9, 9},    // CQUAD9
+                                              {9, 9},    // CQUAD
+                                              {27, 27},  // CHEXA27
+                                              {8, 8},    // CHEXA
+                                              {3, 3},    // CTRIA3
+                                              {4, 10}};  // CTETRA
 
 /*
   This class provides a limited capability to read in nodal and
@@ -38,22 +55,12 @@
   in to the object based on the component number.
 */
 
-// #include "TACSAuxElements.h"
-// #include "TACSCreator.h"
-// #include "TACSToFH5.h"
-#include "TACSObject.h"
-#include "TACSAssembler.h"
-
-const int TacsMeshLoaderNumElementTypes = 10;
-
-extern const char *TacsMeshLoaderElementTypes[TacsMeshLoaderNumElementTypes];
-
-extern const int TacsMeshLoaderElementLimits[TacsMeshLoaderNumElementTypes][2];
+#include "TACSCreator.h"
+#include "TACSToFH5.h"
 
 class TACSMeshLoader : public TACSObject {
  public:
-  // TACSMeshLoader(MPI_Comm _comm);
-  TACSMeshLoader();
+  TACSMeshLoader(MPI_Comm _comm);
   ~TACSMeshLoader();
 
   // Read a BDF file for input
@@ -68,7 +75,7 @@ class TACSMeshLoader : public TACSObject {
 
   // Set the elements corresponding to each of the component numbers
   // ---------------------------------------------------------------
-  // void setElement(int component_num, TACSElement *_element);
+  void setElement(int component_num, TACSElement *_element);
 
   // Retrieve the element numbers corresponding to the given
   // component numbers
@@ -78,33 +85,21 @@ class TACSMeshLoader : public TACSObject {
 
   // Create a TACSToFH5 file writer
   // ------------------------------
-  // TACSToFH5 *createTACSToFH5(TACSAssembler *tacs, ElementType elem_type,
-  //                            int write_flag);
+  TACSToFH5 *createTACSToFH5(TACSAssembler *tacs, ElementType elem_type,
+                             int write_flag);
 
   // Distribute the mesh and create TACS
   // -----------------------------------
-  // TACSAssembler *createTACS(
-  //     int vars_per_node,
-  //     TACSAssembler::OrderingType order_type = TACSAssembler::NATURAL_ORDER,
-  //     TACSAssembler::MatrixOrderingType mat_type = TACSAssembler::DIRECT_SCHUR);
   TACSAssembler *createTACS(
-      int vars_per_node);
-
-  // Set the domain of a structural function with component numbers
-  // --------------------------------------------------------------
-  // void addFunctionDomain(TACSFunction *function, int num_comps,
-  //                        int comp_nums[]);
-
-  // Add the auxiliary element to the given component
-  // ------------------------------------------------
-  // void addAuxElement(TACSAuxElements *aux, int component_num,
-  //                    TACSElement *_element);
+      int vars_per_node,
+      TACSAssembler::OrderingType order_type = TACSAssembler::NATURAL_ORDER,
+      TACSAssembler::MatrixOrderingType mat_type = TACSAssembler::DIRECT_SCHUR);
 
   // Get the node numbers in the Assembler object from the file number
   // -----------------------------------------------------------------
-  // void getAssemblerNodeNums(TACSAssembler *assembler, int num_nodes,
-  //                           int *node_nums, int *num_new_nodes,
-  //                           int **new_nodes);
+  void getAssemblerNodeNums(TACSAssembler *assembler, int num_nodes,
+                            int *node_nums, int *num_new_nodes,
+                            int **new_nodes);
 
   // Get the connectivity and boundary conditions
   // --------------------------------------------
@@ -116,10 +111,10 @@ class TACSMeshLoader : public TACSObject {
 
  private:
   // Communicator for all processors
-  // MPI_Comm comm;
+  MPI_Comm comm;
 
   // The underlying creator object
-  // TACSCreator *creator;
+  TACSCreator *creator;
 
   // The element corresponding to each of the component numbers
   TACSElement **elements;
@@ -153,4 +148,4 @@ class TACSMeshLoader : public TACSObject {
   TacsScalar *bc_vals;
 };
 
-// #endif  // TACS_MESH_LOADER_H
+#endif  // TACS_MESH_LOADER_H

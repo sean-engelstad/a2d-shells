@@ -30,6 +30,7 @@
 
 #include "TACSElementBasis.h"
 #include "TACSElementModel.h"
+#include "TACSElementTypes.h"
 #include "TACSObject.h"
 
 // The TACSElement base class
@@ -56,11 +57,38 @@ class TACSElement : public TACSObject {
   int getComponentNum() { return componentNum; }
 
   /**
+    Get average stresses in the element
+
+    @param elemIndex The element index for each element.
+    @param elem_type The type of element for this element group.
+    @param elemXpts The xyz coordinates of the elements.
+    @param vars The state variables for each element.
+    @param dvars The first time derivative of the state variables for each
+    element.
+    @param ddvars The second time derivative of the state variables for each
+    element
+    @return An array of the average stresses in the element.
+   */
+  virtual void getAverageStresses(int elemIndex, ElementType elem_type,
+                                  const TacsScalar elemXpts[],
+                                  const TacsScalar vars[],
+                                  const TacsScalar dvars[],
+                                  const TacsScalar ddvars[],
+                                  TacsScalar *avgStresses) {}
+
+  /**
     Get a string representation of the element name
 
     @return The name of the element
   */
   const char *getObjectName() { return "TACSElement"; }
+
+  /*
+    Allow users to set default finite difference order for real analysis
+
+    @param order The requested finite difference order
+  */
+  static void setFiniteDifferenceOrder(int order);
 
   /**
     Get the number of degrees of freedom per node for this element
@@ -169,6 +197,134 @@ class TACSElement : public TACSObject {
   virtual TACSElementModel *getElementModel() { return NULL; }
 
   /**
+    Create element traction class
+
+    @return The TACSElement traction class associated with this element.
+    Possibly NULL.
+  */
+  virtual TACSElement *createElementTraction(int faceIndex,
+                                             const TacsScalar t[]) {
+    return NULL;
+  }
+
+  /**
+    Create element pressure class
+
+    @return The TACSElement pressure class associated with this element.
+    Possibly NULL.
+  */
+  virtual TACSElement *createElementPressure(int faceIndex, TacsScalar p) {
+    return NULL;
+  }
+
+  /**
+    Create element inertial force class
+
+    @return The TACSElement inertial force class associated with this element.
+    Possibly NULL.
+  */
+  virtual TACSElement *createElementInertialForce(const TacsScalar g[]) {
+    return NULL;
+  }
+
+  /**
+    Create element centrifugal force class
+
+    @param omega The angular velocity vector
+    @param rotCenter The rotation center
+    @param first_order Whether to include the effect of displacements on the
+    centrifugal force, by default false
+
+    @return The TACSElement centrifugal force class associated with this
+    element. Possibly NULL.
+  */
+  virtual TACSElement *createElementCentrifugalForce(
+      const TacsScalar omega[], const TacsScalar rotCenter[],
+      const bool first_order = false) {
+    return NULL;
+  }
+
+  /**
+    Get the type of element layout for visualization
+
+    @return The layout type for this element
+  */
+  virtual ElementLayout getLayoutType() { return TACS_LAYOUT_NONE; }
+
+  /**
+    Get the output element type for visualization
+
+    @return The output element type for this element
+  */
+  virtual ElementType getElementType() { return TACS_ELEMENT_NONE; }
+
+  /**
+    Get the number of design variables per node.
+
+    The value defaults to one, unless over-ridden by the model
+  */
+  virtual int getDesignVarsPerNode() {
+    TACSElementModel *model = getElementModel();
+    if (model) {
+      model->getDesignVarsPerNode();
+    }
+    return 1;
+  }
+
+  /**
+    Retrieve the global design variable numbers associated with this element
+
+    Note when the dvNums argument is NULL, then the result is a query
+    on the number of design variables and the array is not set.
+
+    @param dvLen The length of the array dvNums
+    @param dvNums An array of the design variable numbers for this element
+    @return The number of design variable numbers defined by the element
+  */
+  virtual int getDesignVarNums(int elemIndex, int dvLen, int dvNums[]) {
+    return 0;
+  }
+
+  /**
+    Set the element design variables from the design vector
+
+    @param elemIndex The local element index
+    @param dvLen The length of the design array
+    @param dvs The design variable values
+    @return The number of design variable numbers defined by the element
+  */
+  virtual int setDesignVars(int elemIndex, int dvLen, const TacsScalar dvs[]) {
+    return 0;
+  }
+
+  /**
+    Get the element design variables values
+
+    @param elemIndex The local element index
+    @param dvLen The length of the design array
+    @param dvs The design variable values
+    @return The number of design variable numbers defined by the element
+  */
+  virtual int getDesignVars(int elemIndex, int dvLen, TacsScalar dvs[]) {
+    return 0;
+  }
+
+  /**
+    Get the lower and upper bounds for the design variable values
+
+    @param elemIndex The local element index
+    @param dvLen The length of the design array
+    @param lowerBound The design variable lower bounds
+    @param lowerBound The design variable upper bounds
+    @return The number of design variable numbers defined by the element
+  */
+  virtual int getDesignVarRange(int elemIndex, int dvLen,
+                                TacsScalar lowerBound[],
+                                TacsScalar upperBound[]) {
+    return 0;
+  }
+
+  /**
     Retrieve the initial conditions for time-dependent analysis
 
     By default, the initial displacements, velocities and accelerations
@@ -187,6 +343,44 @@ class TACSElement : public TACSObject {
     memset(vars, 0, num_vars * sizeof(TacsScalar));
     memset(dvars, 0, num_vars * sizeof(TacsScalar));
     memset(ddvars, 0, num_vars * sizeof(TacsScalar));
+  }
+
+  /**
+    Add the contributions to the derivative from the initial conditions
+
+    @param elemIndex The local element index
+    @param Xpts The element node locations
+    @param adjVars The values of the element adjoint
+    @param adjDVars The adjoint of the first time derivatives
+    @param adjDDVars The adjoint of the first time derivatives
+    @param ddvars The second time derivative of the element DOF
+    @param dvLen The length of the design vector
+  */
+  virtual void addInitConditionAdjResProduct(int elemIndex,
+                                             const TacsScalar Xpts[],
+                                             const TacsScalar adjVars[],
+                                             const TacsScalar adjDVars[],
+                                             const TacsScalar adjDDVars[],
+                                             int dvLen, TacsScalar fdvSens[]) {}
+
+  /**
+    Get the contribution to the derivatives of the initial conditions w.r.t.
+    the node locations
+
+    @param elemIndex The local element index
+    @param Xpts The element node locations
+    @param adjVars The values of the element adjoint
+    @param adjDVars The adjoint of the first time derivatives
+    @param adjDDVars The adjoint of the first time derivatives
+    @param fXptSens Derivative w.r.t. the node locations
+  */
+  virtual void getInitConditionAdjResXptProduct(int elemIndex,
+                                                const TacsScalar Xpts[],
+                                                const TacsScalar adjVars[],
+                                                const TacsScalar adjDVars[],
+                                                const TacsScalar adjDDVars[],
+                                                TacsScalar fXptSens[]) {
+    memset(fXptSens, 0, 3 * getNumNodes() * sizeof(TacsScalar));
   }
 
   /**
@@ -260,6 +454,65 @@ class TACSElement : public TACSObject {
                            TacsScalar res[], TacsScalar mat[]);
 
   /**
+    Add the derivative of the adjoint-residual product to the output vector
+
+    This adds the contribution scaled by an input factor as follows:
+
+    dvSens += scale*d(psi^{T}*(res))/dx
+
+    By default the code is not implemented, but is not required so that
+    analysis can be performed. Correct derivatives require a specific
+    implementation.
+
+    @param elemIndex The local element index
+    @param time The simulation time
+    @param scale The coefficient for the derivative result
+    @param psi The element adjoint variables
+    @param Xpts The element node locations
+    @param vars The values of the element degrees of freedom
+    @param dvars The first time derivative of the element DOF
+    @param ddvars The second time derivative of the element DOF
+    @param dvLen The length of the design variable vector
+    @param dvSens The derivative vector
+  */
+  virtual void addAdjResProduct(int elemIndex, double time, TacsScalar scale,
+                                const TacsScalar psi[], const TacsScalar Xpts[],
+                                const TacsScalar vars[],
+                                const TacsScalar dvars[],
+                                const TacsScalar ddvars[], int dvLen,
+                                TacsScalar dfdx[]);
+
+  /**
+    Add the derivative of the adjoint-residual product to the output vector
+
+    This adds the contribution scaled by an input factor as follows:
+
+    dvSens += scale*d(psi^{T}*(res))/d(Xpts)
+
+    By default the code is not implemented, but is not required so that
+    analysis can be performed. Correct derivatives require a specific
+    implementation.
+
+    @param elemIndex The local element index
+    @param time The simulation time
+    @param scale The coefficient for the derivative result
+    @param psi The element adjoint variables
+    @param Xpts The element node locations
+    @param vars The values of the element degrees of freedom
+    @param dvars The first time derivative of the element DOF
+    @param ddvars The second time derivative of the element DOF
+    @param dvLen The length of the design variable vector
+    @param dvSens The derivative vector
+  */
+  virtual void addAdjResXptProduct(int elemIndex, double time, TacsScalar scale,
+                                   const TacsScalar psi[],
+                                   const TacsScalar Xpts[],
+                                   const TacsScalar vars[],
+                                   const TacsScalar dvars[],
+                                   const TacsScalar ddvars[],
+                                   TacsScalar fXptSens[]);
+
+  /**
     Compute a specific type of element matrix (mass, stiffness, geometric
     stiffness, etc.)
 
@@ -288,6 +541,32 @@ class TACSElement : public TACSObject {
   }
 
   /**
+    Get the element data needed to perform a matrix-vector product
+    with the specified matrix type.
+
+    If the data input is NULL, no data is written, but the function
+    should return the size needed to store the matrix-vector product
+    data.
+
+    @param matType The type of element matrix to compute
+    @param elemIndex The local element index
+    @param time The simulation time
+    @param alpha The coefficient for the DOF Jacobian
+    @param beta The coefficient for the first time derivative DOF Jacobian
+    @param gamma The coefficient for the second time derivative DOF Jacobian
+    @param Xpts The element node locations
+    @param vars The values of the element degrees of freedom
+    @param dvars The first time derivative of the element DOF
+    @param ddvars The second time derivative of the element DOF
+    @param data The element data required for a matrix-vector product
+  */
+  virtual void getMatVecProductData(
+      ElementMatrixType matType, int elemIndex, double time, TacsScalar alpha,
+      TacsScalar beta, TacsScalar gamma, const TacsScalar Xpts[],
+      const TacsScalar vars[], const TacsScalar dvars[],
+      const TacsScalar ddvars[], TacsScalar data[]) {}
+
+  /**
     Compute the element-wise matrix-vector product
 
     @param matType The type of element matrix to compute
@@ -300,6 +579,75 @@ class TACSElement : public TACSObject {
   virtual void addMatVecProduct(ElementMatrixType matType, int elemIndex,
                                 const TacsScalar data[], TacsScalar temp[],
                                 const TacsScalar px[], TacsScalar py[]) {}
+
+  /**
+    Add the derivative of the product of a specific matrix w.r.t.
+    the design variables
+
+    dvSens += scale*d(psi^{T}*(mat)*phi)/d(x)
+
+    where mat is computed via the getMatType().
+
+    @param matType The type of element matrix to compute
+    @param elemIndex The local element index
+    @param time The simulation time
+    @param scale The scalar value that multiplies the derivative
+    @param psi The left-hand vector
+    @param phi The right-hand vector
+    @param Xpts The element node locations
+    @param vars The values of element degrees of freedom
+    @param dvLen The length of the element derivative
+    @param dfdx The element derivative
+  */
+  virtual void addMatDVSensInnerProduct(
+      ElementMatrixType matType, int elemIndex, double time, TacsScalar scale,
+      const TacsScalar psi[], const TacsScalar phi[], const TacsScalar Xpts[],
+      const TacsScalar vars[], int dvLen, TacsScalar dfdx[]);
+
+  /**
+   Add the derivative of the product of a specific matrix w.r.t.
+   the nodal coordinates
+
+   dvSens += scale*d(psi^{T}*(mat)*phi)/d(X)
+
+   where mat is computed via the getMatType().
+
+   @param matType The type of element matrix to compute
+   @param elemIndex The local element index
+   @param time The simulation time
+   @param scale The scalar value that multiplies the derivative
+   @param psi The left-hand vector
+   @param phi The right-hand vector
+   @param Xpts The element node locations
+   @param vars The values of element degrees of freedom
+   @param dfdXpts The element derivative
+ */
+  virtual void addMatXptSensInnerProduct(
+      ElementMatrixType matType, int elemIndex, double time, TacsScalar scale,
+      const TacsScalar psi[], const TacsScalar phi[], const TacsScalar Xpts[],
+      const TacsScalar vars[], TacsScalar dfdXpts[]);
+
+  /**
+    Compute the derivative of the product of a specific matrix w.r.t.
+    the input variables (vars).
+
+    dvSens = d(psi^{T}*(mat)*phi)/d(vars)
+
+    where mat is computed via the getMatType().
+
+    @param matType The type of element matrix to compute
+    @param elemIndex The local element index
+    @param time The simulation time
+    @param psi The left-hand vector
+    @param phi The right-hand vector
+    @param Xpts The element node locations
+    @param vars The values of element degrees of freedom
+    @param dfdu The residual output The element matrix output
+  */
+  virtual void getMatSVSensInnerProduct(
+      ElementMatrixType matType, int elemIndex, double time,
+      const TacsScalar psi[], const TacsScalar phi[], const TacsScalar Xpts[],
+      const TacsScalar vars[], TacsScalar dfdu[]);
 
   /**
     Evaluate a point-wise quantity of interest.
@@ -326,10 +674,99 @@ class TACSElement : public TACSObject {
     return 0;  // No quantities defined by default
   }
 
+  /**
+    Add the derivative of the point quantity w.r.t. the design variables
+
+    @param elemIndex The index of the element
+    @param quantityType The integer indicating the pointwise quantity
+    @param time The simulation time
+    @param n The quadrature point index
+    @param pt The quadrature point
+    @param Xpts The element node locations
+    @param vars The values of the element degrees of freedom
+    @param dvars The first time derivative of the element DOF
+    @param ddvars The second time derivative of the element DOF
+    @param dvLen The length of the design array
+    @param fdvSens The derivative array
+  */
+  virtual void addPointQuantityDVSens(
+      int elemIndex, int quantityType, double time, TacsScalar scale, int n,
+      double pt[], const TacsScalar Xpts[], const TacsScalar vars[],
+      const TacsScalar dvars[], const TacsScalar ddvars[],
+      const TacsScalar dfdq[], int dvLen, TacsScalar dfdx[]);
+
+  /**
+    Add the derivative of the point quantity w.r.t. the state variables
+
+    @param elemIndex The index of the element
+    @param time The simulation time
+    @param quantityType The integer indicating the pointwise quantity
+    @param alpha The coefficient for the state variables
+    @param beta The coefficient for the first time derivatives
+    @param gamma The coefficient for the second time derivatives
+    @param n The quadrature point index
+    @param pt The quadrature point
+    @param Xpts The element node locations
+    @param vars The values of the element degrees of freedom
+    @param dvars The first time derivative of the element DOF
+    @param ddvars The second time derivative of the element DOF
+    @param detXd The determinant of the Jacobian transformation
+    @param dvLen The length of the design array
+    @param dfdu The derivative of the quantity w.r.t. state variables
+  */
+  virtual void addPointQuantitySVSens(
+      int elemIndex, int quantityType, double time, TacsScalar alpha,
+      TacsScalar beta, TacsScalar gamma, int n, double pt[],
+      const TacsScalar Xpts[], const TacsScalar vars[],
+      const TacsScalar dvars[], const TacsScalar ddvars[],
+      const TacsScalar dfdq[], TacsScalar dfdu[]);
+
+  /**
+    Add the derivative of the point quantity w.r.t. the node locations
+
+    @param elemIndex The index of the element
+    @param quantityType The integer indicating the pointwise quantity
+    @param time The simulation time
+    @param scale The scalar factor applied to the derivative
+    @param n The quadrature point index
+    @param pt The quadrature point
+    @param Xpts The element node locations
+    @param vars The values of the element degrees of freedom
+    @param dvars The first time derivative of the element DOF
+    @param ddvars The second time derivative of the element DOF
+    @param dfddetXd The derivative w.r.t. determinant of the Jacobian
+    @param dvLen The length of the design array
+    @param dfdu The derivative of the quantity w.r.t. state variables
+  */
+  virtual void addPointQuantityXptSens(
+      int elemIndex, int quantityType, double time, TacsScalar scale, int n,
+      double pt[], const TacsScalar Xpts[], const TacsScalar vars[],
+      const TacsScalar dvars[], const TacsScalar ddvars[],
+      const TacsScalar dfddetXd, const TacsScalar dfdq[], TacsScalar dfdXpts[]);
+
+  /**
+    Compute the output data for visualization
+
+    @param elemIndex The local element index
+    @param etype The type of element data to be output
+    @param write_flag The type of data to be output
+    @param Xpts The element node locations
+    @param vars The values of the element degrees of freedom
+    @param dvars The first time derivative of the element DOF
+    @param ddvars The second time derivative of the element DOF
+    @param ld_data The dimension of the data
+    @param data The data to be created
+  */
+  virtual void getOutputData(int elemIndex, ElementType etype, int write_flag,
+                             const TacsScalar Xpts[], const TacsScalar vars[],
+                             const TacsScalar dvars[],
+                             const TacsScalar ddvars[], int ld_data,
+                             TacsScalar *data) {}
+
  private:
   int componentNum;
   // Defines order of finite differencing method
-  int fdOrder = 2;
+  static int fdOrder;
 };
 
 #endif  // TACS_ELEMENT_H

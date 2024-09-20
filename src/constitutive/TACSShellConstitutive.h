@@ -52,6 +52,29 @@ class TACSShellConstitutive : public TACSConstitutive {
   virtual void evalMassMoments(int elemIndex, const double pt[],
                                const TacsScalar X[], TacsScalar moments[]) = 0;
 
+  /**
+    Add the contribution of the mass moment sensitivities to the derivative of a
+    function
+
+    Given the sensitivity of some function, f, with respect to the mass moments,
+    this function adds the sensitivity of the function the design variables due
+    to the dependence of the mass moments on the design variables.
+
+    e.g dfdx[0] += scale[0]*dm0/dx1 + scale[1]*dm1/dx1 + scale[2]*dm2/dx1
+        dfdx[1] += scale[0]*dm0/dx2 + scale[1]*dm1/dx2 + scale[2]*dm2/dx2
+
+    @param elemIndex The local element index
+    @param pt The parametric location
+    @param X The point location
+    @param scale Scale factor for the moments
+    @param dvLen the length of the sensitivity array
+    @param dfdx The sensitivity array
+  */
+  virtual void addMassMomentsDVSens(int elemIndex, const double pt[],
+                                    const TacsScalar X[],
+                                    const TacsScalar scale[], int dvLen,
+                                    TacsScalar dfdx[]) {}
+
   // Set the drilling regularization value
   static void setDrillingRegularization(double kval);
 

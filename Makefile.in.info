@@ -1,7 +1,74 @@
-OFLAGS = -Wall -g
-CFLAGS = -c
-CC = g++
-exec = test_sym
+# Do not modify this file. Copy this file to Makefile.in and then modify it.
 
+# In order to get TACS to compile, you'll need to fill in the
+# following path information. Some of the items below are required
+# only if you're going to use the python interface.
+
+# the full path to the root TACS directory
+TACS_DIR = ${HOME}/git/a2d-shells
+CXX = mpicxx
+RM = rm -f
+PYTHON = python
+PIP = pip
+
+# Set up for parallel make
+MAKE = make -j 8
+
+# Set the ar flags
+AR_FLAGS = rcs
+
+# Flags for debugging and regular compilation versions
+EXTRA_DEBUG_CC_FLAGS = -fPIC -g
+EXTRA_CC_FLAGS = -fPIC -O3
+
+# Use this if you have problems with mpich
+# TACS_DEF = -DMPICH_IGNORE_CXX_SEEK
+
+# Defines whether to use static or dynamic linking
+# TACS_LD_CMD=${TACS_DIR}/lib/liba2dshells.a
+TACS_LD_CMD=-L${TACS_DIR}/lib/ -Wl,-rpath,${TACS_DIR}/lib -la2dshells
+
+# For linux systems, use the following settings:
+SO_EXT=so
 SO_LINK_FLAGS=-fPIC -shared
-A2D_SHELLS_DIR = ${HOME}/git/a2d-shells
+
+# For MAC OS X, use the following settings:
+# SO_EXT=so
+# SO_LINK_FLAGS=-fPIC -dynamiclib
+
+# This uses the default installation of LAPACK.
+# Use an optimized version of LAPACK if available.
+# You may also have to include -lblas as well.
+
+LAPACK_LIBS = -L/usr/lib/ -llapack -lpthread -lblas
+
+# For MAC OSX use the accelerate framework
+# LAPACK_LIBS=-framework accelerate
+
+# METIS is handy for partitioning graphs, but can be problematic for
+# compilation.  If you compile METIS using a C++ compiler you must add
+# -DTACS_CPLUSPLUS_METIS to the TACS_DEF arguments below. If you
+# compile METIS using a C compiler, there should be no issues.
+
+METIS_DIR = ${TACS_DIR}/extern/metis
+METIS_INCLUDE = -I${METIS_DIR}/include/
+METIS_LIB = ${METIS_DIR}/lib/libmetis.a
+
+# AMD is a set of routines for ordering matrices, included in the SuiteSparse package. It is not required by default.
+
+# SUITESPARSE_DIR = ${TACS_DIR}/extern/SuiteSparse-7.0.1
+# The variables below should not need to be altered if you are installing SuiteSparse from the standard release tarball
+
+# SUITESPARSE_CONFIG_DIR = ${SUITESPARSE_DIR}/SuiteSparse_config
+# AMD_DIR = ${SUITESPARSE_DIR}/AMD
+# AMD_INCLUDE = -I${AMD_DIR}/Include -I${SUITESPARSE_CONFIG_DIR}
+# AMD_LIBS = ${AMD_DIR}/build/libamd.a ${SUITESPARSE_CONFIG_DIR}/build/libsuitesparseconfig.a
+# TACS_DEF += -DTACS_HAS_AMD_LIBRARY
+
+# TECIO is a library for reading and writing tecplot data files, only required for building f5totec, can use either teciosrc or teciompisrc
+# TECIO_DIR = ${TACS_DIR}/extern/tecio/teciompisrc
+# TECIO_INCLUDE = -I${TECIO_DIR}
+# TECIO_LIB = ${TECIO_DIR}/libtecio*.a
+
+# This may be need to be added to build f5totec with openmpi
+# TECIO_LIB += -lopen-pal

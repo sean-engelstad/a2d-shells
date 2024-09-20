@@ -9,9 +9,7 @@ include ../../A2D_SHELLS.mk
 
 CXX_OBJS = TACSFH5.o \
 	TACSToFH5.o \
-	TACSFH5Loader.o \
-	TACSMeshLoader.o \
-	TACSMarchingCubes.o
+	TACSMeshLoader.o
 
 DIR=${TACS_DIR}/src/io
 

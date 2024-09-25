@@ -11,8 +11,8 @@ TACS_INCLUDE = -I${TACS_DIR}/src \
 	-I${TACS_DIR}/src/utils
 
 # Set the command line flags to use for compilation
-TACS_OPT_CC_FLAGS = ${TACS_DEF} ${EXTRA_CC_FLAGS} ${METIS_INCLUDE} ${AMD_INCLUDE} ${TECIO_INCLUDE} ${TACS_INCLUDE}
-TACS_DEBUG_CC_FLAGS = ${TACS_DEF} ${EXTRA_DEBUG_CC_FLAGS} ${METIS_INCLUDE} ${AMD_INCLUDE} ${TECIO_INCLUDE} ${TACS_INCLUDE}
+TACS_OPT_CC_FLAGS = ${TACS_DEF} ${EXTRA_CC_FLAGS} ${METIS_INCLUDE} ${AMD_INCLUDE} ${TECIO_INCLUDE} ${A2D_INCLUDE} ${TACS_INCLUDE}
+TACS_DEBUG_CC_FLAGS = ${TACS_DEF} ${EXTRA_DEBUG_CC_FLAGS} ${METIS_INCLUDE} ${AMD_INCLUDE} ${TECIO_INCLUDE} ${A2D_INCLUDE} ${TACS_INCLUDE}
 
 # By default, use the optimized flags
 TACS_CC_FLAGS = ${TACS_OPT_CC_FLAGS}
@@ -23,8 +23,9 @@ TACS_LD_FLAGS = ${EXTRA_LD_FLAGS} ${TACS_LD_CMD} ${TACS_EXTERN_LIBS}
 
 # This is the one rule that is used to compile all the
 # source code in TACS
+# change back and force to std=c++11 vs std=c++17
 %.o: %.cpp
-	${CXX} ${TACS_CC_FLAGS} -std=c++11 -c $< -o $*.o
+	${CXX} ${TACS_CC_FLAGS} -std=c++17 -c $< -o $*.o
 	@echo
 	@echo "        --- Compiled $*.cpp successfully ---"
 	@echo

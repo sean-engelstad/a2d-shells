@@ -10,13 +10,7 @@
 #include "TACSShellElementModel.h"
 #include "TACSShellElementTransform.h"
 #include "TACSShellUtilities.h"
-#include "a2dcore.h"
-
-TacsScalar A2D_VecDot(A2D::Vec<TacsScalar, 3> a, A2D::Vec<TacsScalar, 3> b) {
-  TacsScalar myDot = 0.0;
-  A2D::VecDot<TacsScalar, 3>(a, b, myDot);
-  return myDot;
-};
+#include "a2dh.h"
 
 template <class quadrature, class basis, class director, class model>
 class TACSShellElement : public TACSElement {
@@ -241,51 +235,40 @@ void TACSShellElement<quadrature, basis, director, model>::computeEnergies(
     // Get the quadrature weight
     double pt[3];
     double weight = quadrature::getQuadraturePoint(quad_index, pt);
-    
-    // Compute X, X,xi and the interpolated normal n0
-    A2D::Mat<TacsScalar, 3, 3> T;
-    A2D::Vec<TacsScalar, 3> X, n0;
-    A2D::Mat<TacsScalar, 3, 2> Xxi;
-    TacsScalar et; // do we need a2d scalar with this drill strain?
 
-    basis::template interpFields<3, 3>(pt, Xpts, X.get_data());
-    basis::template interpFieldsGrad<3, 3>(pt, Xpts, Xxi.get_data());
-    basis::template interpFields<3, 3>(pt, fn, n0.get_data());
+    // Compute X, X,xi and the interpolated normal n0
+    TacsScalar X[3], Xxi[6], n0[3], T[9], et;
+    basis::template interpFields<3, 3>(pt, Xpts, X);
+    basis::template interpFieldsGrad<3, 3>(pt, Xpts, Xxi);
+    basis::template interpFields<3, 3>(pt, fn, n0);
     basis::template interpFields<1, 1>(pt, etn, &et);
 
     // Compute the transformation at the quadrature point
-    transform->computeTransform(Xxi.get_data(), n0.get_data(), T.get_data());
+    transform->computeTransform(Xxi, n0, T);
 
     // Evaluate the displacement gradient at the point
-    A2D::Mat<TacsScalar, 3, 3> XdinvT, XdinvzT, u0x, u1x;
-    TacsScalar detXd; // can we setup scalars like this in new vs A2D?
-    detXd = TacsShellComputeDispGrad<vars_per_node, basis>(
-        pt, Xpts, vars, fn, d, Xxi.get_data(), n0.get_data(), T.get_data(), 
-        XdinvT.get_data(), XdinvzT.get_data(), u0x.get_data(), u1x.get_data());
+    TacsScalar XdinvT[9], XdinvzT[9];
+    TacsScalar u0x[9], u1x[9];
+    TacsScalar detXd = TacsShellComputeDispGrad<vars_per_node, basis>(
+        pt, Xpts, vars, fn, d, Xxi, n0, T, XdinvT, XdinvzT, u0x, u1x);
     detXd *= weight;
 
     // Evaluate the tying components of the strain
-    // gty might not need to be A2D obj here
-    // A2D::SymMat<TacsScalar, 3> gty; // The symmetric components of the tying strain
-    TacsScalar gty[6];
+    TacsScalar gty[6];  // The symmetric components of the tying strain
     basis::interpTyingStrain(pt, ety, gty);
 
     // Compute the symmetric parts of the tying strain
-    // e0ty might not need to be A2D obj here
-    // A2D::SymMat<TacsScalar, 3> e0ty;
     TacsScalar e0ty[6];  // e0ty = XdinvT^{T}*gty*XdinvT
-    mat3x3SymmTransformTranspose(XdinvT.get_data(), gty, e0ty);
+    mat3x3SymmTransformTranspose(XdinvT, gty, e0ty);
 
     // Compute the set of strain components
-    // based on beam element code => may not need A2D obj for strain
     TacsScalar e[9];  // The components of the strain
-    model::evalStrain(u0x.get_data(), u1x.get_data(), e0ty, e);
+    model::evalStrain(u0x, u1x, e0ty, e);
     e[8] = et;
 
     // Compute the corresponding stresses
-    // based on beam element code => may not need A2D obj for stress
     TacsScalar s[9];
-    con->evalStress(elemIndex, pt, X.get_data(), e, s);
+    con->evalStress(elemIndex, pt, X, e, s);
 
     Uelem +=
         0.5 * detXd *
@@ -294,22 +277,17 @@ void TACSShellElement<quadrature, basis, director, model>::computeEnergies(
 
     // Evaluate the mass moments
     TacsScalar moments[3];
-    con->evalMassMoments(elemIndex, pt, X.get_data(), moments);
+    con->evalMassMoments(elemIndex, pt, X, moments);
 
     // Compute the velocities and the director velocities
-    A2D::Vec<TacsScalar, 3> u0dot, d0dot;
-    // TacsScalar u0dot[3], d0dot[3];
-    basis::template interpFields<vars_per_node, 3>(pt, dvars, u0dot.get_data());
-    basis::template interpFields<3, 3>(pt, ddot, d0dot.get_data());
+    TacsScalar u0dot[3], d0dot[3];
+    basis::template interpFields<vars_per_node, 3>(pt, dvars, u0dot);
+    basis::template interpFields<3, 3>(pt, ddot, d0dot);
 
-    Telem += 0.5 * detXd * 
-              (moments[0] * A2D_VecDot(u0dot, u0dot) +
-              2.0 * moments[1] * A2D_VecDot(u0dot, d0dot) +
-              moments[2] * A2D_VecDot(d0dot, d0dot));
-    // Telem += 0.5 * detXd *
-    //          (moments[0] * vec3Dot(u0dot, u0dot) +
-    //           2.0 * moments[1] * vec3Dot(u0dot, d0dot) +
-    //           moments[2] * vec3Dot(d0dot, d0dot));
+    Telem += 0.5 * detXd *
+             (moments[0] * vec3Dot(u0dot, u0dot) +
+              2.0 * moments[1] * vec3Dot(u0dot, d0dot) +
+              moments[2] * vec3Dot(d0dot, d0dot));
   }
 
   *Te = Telem;

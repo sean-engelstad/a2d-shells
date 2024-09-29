@@ -127,9 +127,18 @@ int main() {
     // Jacobian and solve the linear system for the displacements
     double alpha = 1.0, beta = 0.0, gamma = 0.0;
     assembler->assembleJacobian(alpha, beta, gamma, NULL, matrix);
+
+    // OPTIONAL test assembling the residuals
+    bool test_res = true; // doesn't use in solve but just to see if code works.
+    if (test_res) {
+        assembler->assembleRes(res, 1.0);
+    }
+
     pc->factor();  // LU factorization of stiffness matrix
     pc->applyFactor(f, ans);
     assembler->setVariables(ans);
+
+    
 
     if (rank == 0) {
         printf("Done with RunCRM!\n");

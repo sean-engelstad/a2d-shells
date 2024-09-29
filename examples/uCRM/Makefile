@@ -1,9 +1,9 @@
 include ../../Makefile.in
 include ../../A2D_SHELLS.mk
 
-default: RunCRM.o runcrm
+default: RunCRM.o runcrm.x
 
-runcrm:
+runcrm.x:
 	${CXX} -o runcrm.x RunCRM.o ${TACS_LD_FLAGS}
 
 debug: TACS_CC_FLAGS=${TACS_DEBUG_CC_FLAGS}

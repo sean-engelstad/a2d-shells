@@ -366,12 +366,12 @@ void TACSShellElement<quadrature, basis, director, model>::addResidual(
     A2D::Mat<TacsScalar,3,3> T; // passive
     A2D::Mat<TacsScalar,3,2> Xxi;
     A2D::Vec<TacsScalar,3> X, n0;
-    TacsScalar *et;
-    // TacsScalar X[3], Xxi[6], n0[3], T[9], et;
+    TacsScalar et;
+    
     basis::template interpFields<3, 3>(pt, Xpts, X.get_data());
     basis::template interpFieldsGrad<3, 3>(pt, Xpts, Xxi.get_data());
     basis::template interpFields<3, 3>(pt, fn, n0.get_data());
-    basis::template interpFields<1, 1>(pt, etn, et);
+    basis::template interpFields<1, 1>(pt, etn, &et);
 
     // Compute the transformation at the quadrature point
     transform->computeTransform(Xxi.get_data(), n0.get_data(), T.get_data());
@@ -388,35 +388,40 @@ void TACSShellElement<quadrature, basis, director, model>::addResidual(
     A2D::ADObj<A2D::Mat<TacsScalar, 3, 2>> u0xi; // active
     basis::template interpFieldsGrad<vars_per_node, 3>(pt, vars, u0xi.value().get_data());
 
-    A2D::Vec<TacsScalar, 3> zero{};
-    A2D::ADObj<A2D::Mat<TacsScalar, 3, 3>> Xd, Xdz, Xdinv, XdinvT, XdinvXdz, negXdinvzT;
-    A2D::ADObj<A2D::Mat<TacsScalar, 3, 3>> XdinvzT, u0x_tmp, tmp, tmp2, tmp2_sum, tmp3, u1x_tmp, u1xp, u0x, u1x;
-    A2D::ADObj<TacsScalar> detXd_tmp, detXd;
+    // passive variables
+    A2D::Vec<TacsScalar, 3> zero; // {} need to initialize ?
+    A2D::Mat<TacsScalar, 3, 3> Xd, Xdz, Xdinv, XdinvT, XdinvXdz, negXdinvzT, XdinvzT;
+
+    // active variables (all steps starting from d0xi, u0xi, d0 are active)
+    A2D::ADObj<A2D::Mat<TacsScalar, 3, 3>> u0xi_frame, u1xi_frame, u0x_tmp, u1x_tmp1, 
+                                           u1x_tmp2, u1x_tmp3, u0x, u1x;
+    A2D::ADObj<TacsScalar> _detXd, detXd;
+
     const A2D::MatOp NORMAL = A2D::MatOp::NORMAL;
     const A2D::MatOp TRANSPOSE = A2D::MatOp::TRANSPOSE;
 
     // make an XDSM diagram of the dependence (and what A2D handles the backprop derivs for) => useful to show to Kevin
     // goes from d0, u0xi, d0xi => u0x, u1x (most important values)
     auto disp_grad_stack = A2D::MakeStack(
-      // compute shell basis and transform matrices
+      // compute shell basis and transform matrices (passive portion)
       A2D::ShellAssembleFrame(Xxi, n0, Xd),
       A2D::ShellAssembleFrame(nxi, zero, Xdz), // the zero one
       A2D::MatInv(Xd, Xdinv),
-      A2D::MatDet(Xd, detXd_tmp),
-      A2D::Eval(weight * detXd_tmp, detXd),
+      A2D::MatDet(Xd, _detXd),
+      A2D::Eval(weight * _detXd, detXd),
       A2D::MatMatMult(Xdinv, Xdz, XdinvXdz),
       A2D::MatMatMult(Xdinv, T, XdinvT),
       A2D::MatMatMult(XdinvXdz, XdinvT, XdinvzT),
       A2D::MatScale(-1.0, XdinvzT, negXdinvzT),
-      // assemble u0x, u1x gradients and transform their coordinates
-      A2D::ShellAssembleFrame(u0xi, d0, u0x_tmp),
-      A2D::ShellAssembleFrame(d0xi, zero, u1x_tmp),
-      A2D::MatMatMult(u1x_tmp, XdinvT, tmp),
-      A2D::MatMatMult(u0x_tmp, negXdinvzT, tmp2), // could we have MatMatMultAdd here?
-      A2D::MatSum(tmp, tmp2, tmp2_sum),
-      A2D::MatMatMult<TRANSPOSE, NORMAL>(T, tmp2_sum, u1x),
-      A2D::MatMatMult(u0x_tmp, XdinvT, tmp3),
-      A2D::MatMatMult<TRANSPOSE, NORMAL>(T, tmp3, u0x) // could maybe add Expr for A^T * B * A to make shorter
+      // assemble u0x, u1x gradients and transform their coordinates (active portion)
+      A2D::ShellAssembleFrame(u0xi, d0, u0xi_frame),
+      A2D::ShellAssembleFrame(d0xi, zero, d0xi_frame),
+      A2D::MatMatMult(u1xi_frame, XdinvT, u1x_tmp1),
+      A2D::MatMatMult(u0xi_frame, negXdinvzT, u1x_tmp2), // could we have MatMatMultAdd here?
+      A2D::MatSum(u1x_tmp1, u1x_tmp2, u1x_tmp3),
+      A2D::MatMatMult<TRANSPOSE, NORMAL>(T, u1x_tmp3, u1x),
+      A2D::MatMatMult(u0xi_frame, XdinvT, u0x_tmp),
+      A2D::MatMatMult<TRANSPOSE, NORMAL>(T, u0x_tmp, u0x) // could maybe add Expr for A^T * B * A to make shorter
     );
 
     // Evaluate the tying components of the strain
@@ -430,7 +435,7 @@ void TACSShellElement<quadrature, basis, director, model>::addResidual(
     // Compute the set of strain components
     TacsScalar e[9];  // The components of the strain
     model::evalStrain(u0x.value().get_data(), u1x.value().get_data(), e0ty, e);
-    e[8] = *et;
+    e[8] = et;
 
     // Compute the corresponding stresses
     TacsScalar s[9];

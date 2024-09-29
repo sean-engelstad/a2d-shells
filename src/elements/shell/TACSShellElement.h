@@ -366,31 +366,31 @@ void TACSShellElement<quadrature, basis, director, model>::addResidual(
     A2D::Mat<TacsScalar,3,3> T; // passive
     A2D::Mat<TacsScalar,3,2> Xxi;
     A2D::Vec<TacsScalar,3> X, n0;
-    A2D::ADObj<TacsScalar> et; // should be passive?
+    TacsScalar *et;
     // TacsScalar X[3], Xxi[6], n0[3], T[9], et;
     basis::template interpFields<3, 3>(pt, Xpts, X.get_data());
     basis::template interpFieldsGrad<3, 3>(pt, Xpts, Xxi.get_data());
     basis::template interpFields<3, 3>(pt, fn, n0.get_data());
-    basis::template interpFields<1, 1>(pt, etn, et.value());
+    basis::template interpFields<1, 1>(pt, etn, et);
 
     // Compute the transformation at the quadrature point
     transform->computeTransform(Xxi.get_data(), n0.get_data(), T.get_data());
 
     A2D::Mat<TacsScalar,3,2> nxi; //passive
-    basis::template interpFieldsGrad<3, 3>(pt, fn, nxi);
+    basis::template interpFieldsGrad<3, 3>(pt, fn, nxi.get_data());
     
     A2D::ADObj<A2D::Vec<TacsScalar,3>> d0; // active
     A2D::ADObj<A2D::Mat<TacsScalar,3,2>> d0xi;
-    basis::template interpFields<3, 3>(pt, d, d0.value());
-    basis::template interpFieldsGrad<3, 3>(pt, d, d0xi.value());
+    basis::template interpFields<3, 3>(pt, d, d0.value().get_data());
+    basis::template interpFieldsGrad<3, 3>(pt, d, d0xi.value().get_data());
 
     // Compute the gradient of the displacement solution at the quadrature points
     A2D::ADObj<A2D::Mat<TacsScalar, 3, 2>> u0xi; // active
-    basis::template interpFieldsGrad<vars_per_node, 3>(pt, vars, u0xi.value());
+    basis::template interpFieldsGrad<vars_per_node, 3>(pt, vars, u0xi.value().get_data());
 
     A2D::Vec<TacsScalar, 3> zero{};
-    A2D::ADObj<Mat<TacsScalar, 3, 3>> Xd, Xdz, Xdinv, XdinvT, XdinvXdz, negXdinvzT;
-    A2D::ADObj<Mat<TacsScalar, 3, 3>> XdinvzT, u0x_tmp, tmp, tmp2, u1x_tmp, u1xp, u0x, u1x;
+    A2D::ADObj<A2D::Mat<TacsScalar, 3, 3>> Xd, Xdz, Xdinv, XdinvT, XdinvXdz, negXdinvzT;
+    A2D::ADObj<A2D::Mat<TacsScalar, 3, 3>> XdinvzT, u0x_tmp, tmp, tmp2, tmp2_sum, tmp3, u1x_tmp, u1xp, u0x, u1x;
     A2D::ADObj<TacsScalar> detXd_tmp, detXd;
     const A2D::MatOp NORMAL = A2D::MatOp::NORMAL;
     const A2D::MatOp TRANSPOSE = A2D::MatOp::TRANSPOSE;
@@ -401,8 +401,8 @@ void TACSShellElement<quadrature, basis, director, model>::addResidual(
       // compute shell basis and transform matrices
       A2D::ShellAssembleFrame(Xxi, n0, Xd),
       A2D::ShellAssembleFrame(nxi, zero, Xdz), // the zero one
-      A2D::MatInv<TacsScalar, 3>(Xd, Xdinv),
-      A2D::MatDet<TacsScalar, 3>(Xd, detXd_tmp),
+      A2D::MatInv(Xd, Xdinv),
+      A2D::MatDet(Xd, detXd_tmp),
       A2D::Eval(weight * detXd_tmp, detXd),
       A2D::MatMatMult(Xdinv, Xdz, XdinvXdz),
       A2D::MatMatMult(Xdinv, T, XdinvT),
@@ -412,10 +412,11 @@ void TACSShellElement<quadrature, basis, director, model>::addResidual(
       A2D::ShellAssembleFrame(u0xi, d0, u0x_tmp),
       A2D::ShellAssembleFrame(d0xi, zero, u1x_tmp),
       A2D::MatMatMult(u1x_tmp, XdinvT, tmp),
-      A2D::MatMatMultAdd(u0x_tmp, negXdinvzT, tmp),
-      A2D::MatMatMult<TRANSPOSE, NORMAL>(T, tmp, u1x),
-      A2D::MatMatMult(u0x_tmp, XdinvT, tmp2),
-      A2D::MatMatMult<TRANSPOSE, NORMAL>(T, tmp2, u0x) // could maybe add Expr for A^T * B * A to make shorter
+      A2D::MatMatMult(u0x_tmp, negXdinvzT, tmp2), // could we have MatMatMultAdd here?
+      A2D::MatSum(tmp, tmp2, tmp2_sum),
+      A2D::MatMatMult<TRANSPOSE, NORMAL>(T, tmp2_sum, u1x),
+      A2D::MatMatMult(u0x_tmp, XdinvT, tmp3),
+      A2D::MatMatMult<TRANSPOSE, NORMAL>(T, tmp3, u0x) // could maybe add Expr for A^T * B * A to make shorter
     );
 
     // Evaluate the tying components of the strain
@@ -424,49 +425,50 @@ void TACSShellElement<quadrature, basis, director, model>::addResidual(
 
     // Compute the symmetric parts of the tying strain
     TacsScalar e0ty[6];  // e0ty = XdinvT^{T}*gty*XdinvT
-    mat3x3SymmTransformTranspose(XdinvT.value(), gty, e0ty);
+    mat3x3SymmTransformTranspose(XdinvT.value().get_data(), gty, e0ty);
 
     // Compute the set of strain components
     TacsScalar e[9];  // The components of the strain
-    model::evalStrain(u0x, u1x, e0ty, e);
-    e[8] = et;
+    model::evalStrain(u0x.value().get_data(), u1x.value().get_data(), e0ty, e);
+    e[8] = *et;
 
     // Compute the corresponding stresses
     TacsScalar s[9];
-    con->evalStress(elemIndex, pt, X, e, s);
+    con->evalStress(elemIndex, pt, X.get_data(), e, s);
 
     // Compute the derivative of the product of the stress and strain
     // with respect to u0x, u1x and e0ty
     TacsScalar de0ty[6];
-    model::evalStrainSens(detXd, s, u0x, u1x, u0x.bvalue(), u1x.bvalue(), de0ty);
+    model::evalStrainSens(detXd.value(), s, u0x.value().get_data(), u1x.value().get_data(),
+               u0x.bvalue().get_data(), u1x.bvalue().get_data(), de0ty);
 
     // Add the contribution to the drilling strain
-    TacsScalar det = detXd * s[8];
+    TacsScalar det = detXd.value() * s[8];
     basis::template addInterpFieldsTranspose<1, 1>(pt, &det, detn);
     
     // replace TacsShellAddDispGradSens with A2D
     // output seeds u0x, u1x bvalue()'s found earlier in evalStrainSens
     disp_grad_stack.reverse();
-    basis::template addInterpFieldsTranspose<3, 3>(pt, d0.bvalue(), dd);
-    basis::template addInterpFieldsGradTranspose<3, 3>(pt, d0xi.bvalue(), dd);
-    basis::template addInterpFieldsGradTranspose<vars_per_node, 3>(pt, u0xi.bvalue(),
+    basis::template addInterpFieldsTranspose<3, 3>(pt, d0.bvalue().get_data(), dd);
+    basis::template addInterpFieldsGradTranspose<3, 3>(pt, d0xi.bvalue().get_data(), dd);
+    basis::template addInterpFieldsGradTranspose<vars_per_node, 3>(pt, u0xi.bvalue().get_data(),
                                                                   res);
 
     // Compute the of the tying strain w.r.t. derivative w.r.t. the coefficients
-    TacsScalar dgty[6];
-    mat3x3SymmTransformTransSens(XdinvT.value(), de0ty, dgty);
+    TacsScalar dgty[6]; // way to do get_data() and get_bdata() in ADObj in future?
+    mat3x3SymmTransformTransSens(XdinvT.value().get_data(), de0ty, dgty);
 
     // Evaluate the tying strain
     basis::addInterpTyingStrainTranspose(pt, dgty, dety);
 
     // Evaluate the mass moments
     A2D::Vec<TacsScalar,3> moments;
-    con->evalMassMoments(elemIndex, pt, X, moments.get_data());
+    con->evalMassMoments(elemIndex, pt, X.get_data(), moments.get_data());
 
     // Evaluate first time derivatives (new addition, necessary for A2D here)
     A2D::ADObj<A2D::Vec<TacsScalar,3>> u0dot, d0dot;
-    basis::template interpFields<vars_per_node, 3>(pt, dvars, u0dot.value());
-    basis::template interpFields<3, 3>(pt, ddot, d0dot.value());
+    basis::template interpFields<vars_per_node, 3>(pt, dvars, u0dot.value().get_data());
+    basis::template interpFields<3, 3>(pt, ddot, d0dot.value().get_data());
 
     // Evaluate the second time derivatives
     A2D::Vec<TacsScalar,3> u0ddot, d0ddot;
@@ -484,7 +486,7 @@ void TACSShellElement<quadrature, basis, director, model>::addResidual(
       A2D::VecDot(u0dot, d0ddot, ud_term1),
       A2D::VecDot(u0ddot, d0dot, ud_term2),
       A2D::VecDot(d0dot, d0ddot, dd_term),
-      Eval(0.5 * detXd.value() * (moments[0] * uu_term1 + moments[1] *
+      Eval(0.5 * detXd * (moments[0] * uu_term + moments[1] *
            (ud_term1 + ud_term2) + moments[2] * dd_term), dTelem_dt)
     );
 
@@ -493,8 +495,8 @@ void TACSShellElement<quadrature, basis, director, model>::addResidual(
     Telem_dot_stack.reverse();
 
     // Add the contributions to the derivative (backpropped from A2D)
-    basis::template addInterpFieldsTranspose<vars_per_node, 3>(pt, u0dot.bvalue(), res);
-    basis::template addInterpFieldsTranspose<3, 3>(pt, d0dot.value(), dd);
+    basis::template addInterpFieldsTranspose<vars_per_node, 3>(pt, u0dot.bvalue().get_data(), res);
+    basis::template addInterpFieldsTranspose<3, 3>(pt, d0dot.value().get_data(), dd);
   }
 
   // Add the contribution to the residual from the drill strain

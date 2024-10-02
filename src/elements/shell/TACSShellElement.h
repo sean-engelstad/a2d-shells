@@ -398,7 +398,8 @@ void TACSShellElement<quadrature, basis, director, model>::addResidual(
     transform->computeTransform(Xxi.get_data(), n0.get_data(), T.get_data()); 
 
     // compute ABD matrix from shell theory (prospective)
-    con->getABD(pt, X, A, B, D); // TODO
+    A2D::SymMat<TacsScalar,9> ABD; // normally ABD is 6x6, but this one includes transverse shear and drill strains
+    con->getABDmatrix(pt, X, ABD.get_data()); // TODO make this routine
 
     // passive variables for strain energy stack
     A2D::Vec<TacsScalar, 3> zero;
@@ -407,14 +408,15 @@ void TACSShellElement<quadrature, basis, director, model>::addResidual(
     // active variables for strain energy stack
     A2D::ADObj<TacsScalar> detXd, ES_dot, Uelem;
     A2D::ADObj<A2D::Vec<TacsScalar,9>> E, S;
-    A2D::ADObj<A2D::Mat<TacsScalar, 3, 3>> u0xi_frame, u1xi_frame, u0x_tmp, u1x_tmp, u1x_term1, u1x_term2, u0x, u1x;
+    A2D::ADObj<A2D::Mat<TacsScalar, 3, 3>> u0x_tmp, u1x_tmp1, u1x_tmp2, u1x_tmp3, u1x_term1, u1x_term2, u1x_sum; // temp variables
+    A2D::ADObj<A2D::Mat<TacsScalar, 3, 3>> u0xi_frame, u1xi_frame, u0x, u1x;
 
     const A2D::MatOp NORMAL = A2D::MatOp::NORMAL, TRANSPOSE = A2D::MatOp::TRANSPOSE;
-    const A2D::ElastModel LINEARITY = A2D::ElastModel::LINEAR // check if linear or nonlinear model then change with template..
+    const A2D::ShellStrainType STRAIN_TYPE = A2D::ShellStrainType::LINEAR; // if condition on type of model here..
 
     // compute the strain energy from d0, d0xi, u0xi
     auto strain_energy_stack = A2D::MakeStack(
-      // compute shell basis and transform matrices (passive portion)
+      // part 1 - compute shell basis and transform matrices (passive portion)
       A2D::ShellAssembleFrame(Xxi, n0, Xd), 
       A2D::ShellAssembleFrame(nxi, zero, Xdz), 
       A2D::ShellAssembleFrame(u0xi, d0, u0xi_frame),
@@ -422,19 +424,24 @@ void TACSShellElement<quadrature, basis, director, model>::addResidual(
       A2D::MatInv(Xd, Xdinv),
       A2D::MatDet(Xd, detXd),
       A2D::MatMatMult(Xdinv, T, XdinvT),
-      // compute u0x midplane disp gradient
+      // part 2 - compute u0x midplane disp gradient
       A2D::MatMatMult(u0xi_frame, Xdinv, u0x_tmp),
-      A2D::MatMatRotateFrame(u0x_tmp, T, u0x), // TODO : add this expression for A^T * B * A
-      // compute u1x director disp gradient
+      A2D::MatRotateFrame(u0x_tmp, T, u0x),
+      // part 3 - compute u1x director disp gradient
       A2D::MatMatMult(u1xi_frame, Xdinv, u1x_term1),
-      A2D::MatMatMultGroup<4>(u0xi_frame, Xdinv, Xdz, Xdinv, u1x_term2), // TODO : add this expression
-      A2D::MatSum<SUBTRACT>(u1x_term1, u1x_term2, u1x_tmp), // could add subtraction template parameter here
-      A2D::MatMatRotateFrame(u1x_tmp, T, u1x),
-      // compute transformed tying strain e0ty
-      A2D::MatMatRotateFrame(gty, XdinvT, e0ty),
-      // compute strains, stresses and then strain energy
-      A2D::ShellStrain<LINEARITY>(u0x, u1x, e0ty, et, E), // TODO : new routine
-      A2D::ShellStress(A, B, D, E, S), // TODO : new routine
+      // computes u0xi_frame * Xdinv * Xdz * Xdinv => u1x_term2 
+      A2D::MatMatMult(u0xi_frame, Xdinv, u1x_tmp1), 
+      A2D::MatMatMult(u1x_tmp1, Xdz, u1x_tmp2), 
+      A2D::MatMatMult(u1x_tmp2, Xdinv, u1x_term2),
+      // compute final u1x = T^T * (u0x * Xdinv - u1x * Xdinv * Xdz * Xdinv) * T
+      A2D::MatSum(1.0, u1x_term1, -1.0, u1x_term2, u1x_sum),
+      A2D::MatRotateFrame(u1x_sum, T, u1x),
+      // part 4 - compute transformed tying strain e0ty
+      A2D::MatRotateFrame(gty, XdinvT, e0ty),
+      // part 5 - compute strains, stresses and then strain energy
+      A2D::ShellStrain<STRAIN_TYPE>(u0x, u1x, e0ty, et, E),
+      A2D::MatMult(ABD, E, S),
+      // part 6 - compute strain energy
       A2D::VecDot(E, S, ES_dot),
       A2D::Eval(0.5 * weight * detXd * ES_dot, Uelem)
     );

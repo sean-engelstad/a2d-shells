@@ -32,6 +32,7 @@ class TACSShellElement : public TACSElement {
   static const int num_nodes = basis::NUM_NODES;
 
   bool complexStepGmatrix = false;
+  TacsScalar temperature = 0.0;
 
   TACSShellElement(TACSShellTransform *_transform,
                    TACSShellConstitutive *_con) {
@@ -72,6 +73,8 @@ class TACSShellElement : public TACSElement {
 
   int getVarsPerNode() { return vars_per_node; }
   int getNumNodes() { return num_nodes; }
+  void setTemperature(TacsScalar _temp) {temperature = _temp;}
+  TacsScalar getTemperature() { return temperature; }
 
   ElementLayout getLayoutType() { return basis::getLayoutType(); }
 
@@ -368,10 +371,21 @@ void TACSShellElement<quadrature, basis, director, model>::addResidual(
     TacsScalar e[9];  // The components of the strain
     model::evalStrain(u0x, u1x, e0ty, e);
     e[8] = et;
+    
+    // add thermal strain from prescribed temperature field
+    TacsScalar eth[9];
+    TacsScalar temp = temperature * 1.0;
+    con->evalThermalStrain(elemIndex, pt, X, temp, eth);
+
+    // Compute the mechanical strain (and stress)
+    TacsScalar em[9];
+    for (int i = 0; i < 9; i++) {
+      em[i] = e[i] - eth[i];
+    }
 
     // Compute the corresponding stresses
     TacsScalar s[9];
-    con->evalStress(elemIndex, pt, X, e, s);
+    con->evalStress(elemIndex, pt, X, em, s);
 
     // Compute the derivative of the product of the stress and strain
     // with respect to u0x, u1x and e0ty
@@ -532,6 +546,21 @@ void TACSShellElement<quadrature, basis, director, model>::addJacobian(
     model::evalStrain(u0x, u1x, e0ty, e);
     e[8] = et;
 
+    // add thermal strain from prescribed temperature field
+    TacsScalar eth[9];
+    TacsScalar temp = temperature * 1.0;
+    con->evalThermalStrain(elemIndex, pt, X, temp, eth);
+
+    // printf("temperature = %.8e\n", temp);
+    // printf("eth[0] = %.8e\n", eth[0]);
+    // printf("eth[1] = %.8e\n", eth[1]);
+
+    // Compute the mechanical strain (and stress)
+    TacsScalar em[9];
+    for (int i = 0; i < 9; i++) {
+      em[i] = e[i] - eth[i];
+    }
+
     // Compute the tangent stiffness matrix
     TacsScalar Cs[TACSShellConstitutive::NUM_TANGENT_STIFFNESS_ENTRIES];
     con->evalTangentStiffness(elemIndex, pt, X, Cs);
@@ -542,7 +571,7 @@ void TACSShellElement<quadrature, basis, director, model>::addJacobian(
 
     // Compute the stress based on the tangent stiffness
     TacsScalar s[9];
-    TACSShellConstitutive::computeStress(A, B, D, As, drill, e, s);
+    TACSShellConstitutive::computeStress(A, B, D, As, drill, em, s);
 
     // Compute the derivative of the product of the stress and strain
     // with respect to u0x, u1x and e0ty
@@ -683,6 +712,9 @@ void TACSShellElement<quadrature, basis, director, model>::getMatType(
       norm += vars[i] * vars[i];
     }
 
+    // include thermal path in norm
+    norm += temperature * temperature;
+
     if (TacsRealPart(norm) == 0.0) {
       norm = 1.0;
     } else {
@@ -698,6 +730,11 @@ void TACSShellElement<quadrature, basis, director, model>::getMatType(
       path[i] = dh * vars[i] / norm;
     }
 
+    // temperature perturbation as well (for thermal buckling)
+    TacsScalar my_dh = dh_mag;
+    nlElem->setTemperature(temperature + my_dh * temperature / norm);
+    // printf("temperature1 = %.8e\n", nlElem->getTemperature());
+
     nlElem->addJacobian(elemIndex, time, alpha, beta, gamma, Xpts, path, vars,
                         vars, res, mat);
 
@@ -705,6 +742,10 @@ void TACSShellElement<quadrature, basis, director, model>::getMatType(
     for (int i = 0; i < vars_per_node * num_nodes; i++) {
       path[i] = -dh * vars[i] / norm;
     }
+
+    // temperature perturbation as well (for thermal buckling)
+    nlElem->setTemperature(temperature - my_dh * temperature / norm);
+    // printf("temperature2 = %.8e\n", nlElem->getTemperature());
 
     nlElem->addJacobian(elemIndex, time, -alpha, beta, gamma, Xpts, path, vars,
                         vars, res, mat);

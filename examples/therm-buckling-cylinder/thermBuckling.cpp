@@ -87,7 +87,7 @@ int main() {
     }
 
     // set temperature into all elements for thermal buckling
-    TacsScalar temperature = 1.0; // 1 deg K
+    TacsScalar temperature = 100.0; // default 1.0 // 1 deg K
     int numElements = assembler->getNumElements();
     TACSQuad4Shell *elem;
     for (int ielem = 0; ielem < numElements; ielem++) {
@@ -130,7 +130,7 @@ int main() {
     solver->incref();
 
     // make the buckling solver
-    TacsScalar sigma = 100.0;
+    TacsScalar sigma = 5.0;
     int max_lanczos_vecs = 100, num_eigvals = 10;
     double eig_tol = 1e-6;
 

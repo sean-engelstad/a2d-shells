@@ -829,6 +829,42 @@ int TACSMeshLoader::scanBDFFile(const char *file_name) {
           file_Xpts[3 * num_nodes + 1] = y;
           file_Xpts[3 * num_nodes + 2] = z;
           num_nodes++;
+        } else if (strncmp(line, "SPC*", 4) == 0) {
+          // This is a variable-length format. Read in grid points until
+          // zero is reached. This is a fixed-width format
+          // SPC* SID  G1  C  D
+
+          // printf("entered the SPC card\n");
+
+          // Read in the nodal value
+          char node[9+8];
+          strncpy(node, &line[24], 16);
+          node[16] = '\0';
+          bc_nodes[num_bcs] = atoi(node) - 1;
+          // printf("\tnode = %d\n", atoi(node));
+
+          strncpy(node, &line[56], 16);
+          node[16] = '\0';
+          double val = bdf_atof(node);
+          // printf("\tvalue = %.8f\n", val);
+
+          // Read in the dof that will be constrained
+          for (int k = 40; k < 56; k++) {
+            char dofs[9] = "12345678";
+
+            for (int j = 0; j < 8; j++) {
+              if (dofs[j] == line[k]) {
+                bc_vars[bc_vars_size] = j;
+                bc_vals[bc_vars_size] = val;
+                bc_vars_size++;
+                // printf("\tconstr on %d\n", j+1);
+                break;
+              }
+            }
+          }
+
+          bc_ptr[num_bcs + 1] = bc_vars_size;
+          num_bcs++;
         } else if (strncmp(line, "SPC", 3) == 0) {
           // This is a variable-length format. Read in grid points until
           // zero is reached. This is a fixed-width format

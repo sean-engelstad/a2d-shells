@@ -763,6 +763,9 @@ class TACSElement : public TACSObject {
                              const TacsScalar ddvars[], int ld_data,
                              TacsScalar *data) {}
 
+  virtual void setTemperature(TacsScalar _temp) {}
+  virtual TacsScalar getTemperature() { return 0.0; }
+
  private:
   int componentNum;
   // Defines order of finite differencing method

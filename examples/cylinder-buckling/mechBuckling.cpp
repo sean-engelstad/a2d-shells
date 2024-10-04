@@ -26,7 +26,7 @@ int main() {
     
     TACSMeshLoader *mesh = new TACSMeshLoader(comm);
     mesh->incref();
-    mesh->scanBDFFile("cylinder.bdf");
+    mesh->scanBDFFile("mech-cylinder.bdf");
 
     // get number of components
     int num_components = mesh->getNumComponents();
@@ -87,7 +87,8 @@ int main() {
     }
 
     // set temperature into all elements for thermal buckling
-    TacsScalar temperature = 100.0; // default 1.0 // 1 deg K
+    // set to 0 for mechanical buckling
+    TacsScalar temperature = 0.0; 
     int numElements = assembler->getNumElements();
     TACSQuad4Shell *elem;
     for (int ielem = 0; ielem < numElements; ielem++) {
@@ -119,7 +120,7 @@ int main() {
     TACSSchurMat *aux_mat = assembler->createSchurMat();  // auxillary matrix for shift and invert solver
 
     // Allocate the factorization
-    int lev = 10000;
+    int lev = 1e6;
     double fill = 10.0;
     int reorder_schur = 1;
     TACSSchurPc *pc = new TACSSchurPc(kmat, lev, fill, reorder_schur);
@@ -129,10 +130,15 @@ int main() {
     GMRES *solver = new GMRES(aux_mat, pc, subspaceSize, nrestarts, isFlexible);
     solver->incref();
 
+    // set relative tolerances
+    solver->setTolerances(1e-12, 1e-12);
+
+    // TODO : need to increase tolerances in the GMRES solver.. (see bucklingProb in python L2Convergence and setTolerances in GMRES)
+
     // make the buckling solver
-    TacsScalar sigma = 5.0;
-    int max_lanczos_vecs = 100, num_eigvals = 10;
-    double eig_tol = 1e-6;
+    TacsScalar sigma = 10.0;
+    int max_lanczos_vecs = 100, num_eigvals = 50; // need high enough # eigvals to get it right
+    double eig_tol = 1e-12;
 
     TACSLinearBuckling *buckling = new TACSLinearBuckling(assembler, sigma,
                      gmat, kmat, aux_mat, solver, max_lanczos_vecs, num_eigvals, eig_tol);
@@ -153,34 +159,33 @@ int main() {
     TACSToFH5 *f5 =
         new TACSToFH5(assembler, TACS_BEAM_OR_SHELL_ELEMENT, write_flag);
     f5->incref();
-    
-    f5->decref();
 
     // write each of the buckling modes to a file
     
     TACSBVec *phi = assembler->createVec();
     phi->incref();
+    TacsScalar error;
     for (int imode = 0; imode < num_eigvals; imode++) {
-        double *error;
-        buckling->extractEigenvector(imode, phi, error);
+        buckling->extractEigenvector(imode, phi, &error);
         assembler->setVariables(phi);   
-        std::string filename = "therm-buckle" + std::to_string(imode) + ".f5";
+        std::string filename = "_buckling/mech-buckle" + std::to_string(imode) + ".f5";
         const char *cstr_filename = filename.c_str();
         f5->writeToFile(cstr_filename);
     }    
 
     // decref all data
-    x->decref();
-    aux_mat->decref();
-    kmat->decref();
-    gmat->decref();
-    pc->decref();
-    solver->decref();
-    u0->decref();
-    f->decref();
-    phi->decref();
-    buckling->decref();
-    ksm_print->decref();
+    // f5->decref();
+    // x->decref();
+    // aux_mat->decref();
+    // kmat->decref();
+    // gmat->decref();
+    // pc->decref();
+    // solver->decref();
+    // u0->decref();
+    // f->decref();
+    // phi->decref();
+    // buckling->decref();
+    // ksm_print->decref();
 
     MPI_Finalize();
 

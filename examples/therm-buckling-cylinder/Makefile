@@ -1,10 +1,10 @@
 include ../../Makefile.in
 include ../../A2D_SHELLS.mk
 
-default: therm-buckling.o therm-buckling.x
+default: thermBuckling.o therm-buckling.x
 
 therm-buckling.x:
-	${CXX} -o therm-buckling.x therm-buckling.o ${TACS_LD_FLAGS}
+	${CXX} -o therm-buckling.x thermBuckling.o ${TACS_LD_FLAGS}
 
 debug: TACS_CC_FLAGS=${TACS_DEBUG_CC_FLAGS}
 debug: default

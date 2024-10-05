@@ -88,12 +88,11 @@ int main() {
 
     // set temperature into all elements for thermal buckling
     // set to 0 for mechanical buckling
-    TacsScalar temperature = 0.0; 
     int numElements = assembler->getNumElements();
     TACSQuad4Shell *elem;
     for (int ielem = 0; ielem < numElements; ielem++) {
         elem = dynamic_cast<TACSQuad4Shell *>(assembler->getElement(ielem));
-        elem->setTemperature(temperature);
+        elem->setTemperature(0.0);
     }
 
     // Solve the linear static analysis

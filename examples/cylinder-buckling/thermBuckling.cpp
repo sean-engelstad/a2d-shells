@@ -162,12 +162,12 @@ int main() {
     f5->incref();
 
     // write each of the buckling modes to a file
-    
     TACSBVec *phi = assembler->createVec();
     phi->incref();
     TacsScalar error;
     for (int imode = 0; imode < num_eigvals; imode++) {
         buckling->extractEigenvector(imode, phi, &error);
+        // Emily wants me to normalize the eigenvector here
         assembler->setVariables(phi);   
         std::string filename = "_buckling/therm-buckle" + std::to_string(imode) + ".f5";
         const char *cstr_filename = filename.c_str();

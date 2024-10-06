@@ -84,10 +84,6 @@ class TACSShellConstitutive : public TACSConstitutive {
                                       const TacsScalar **D,
                                       const TacsScalar **As, TacsScalar *drill);
 
-  // compute the ABD matrix
-  void getABDmatrix(int elemIndex, const double pt[],
-               const TacsScalar X[], TacsScalar ABD[]);
-
   // Once the stiffness matrices have been evaluated, use this
   // function to compute the stress given the strain components
   static inline void computeStress(const TacsScalar A[], const TacsScalar B[],

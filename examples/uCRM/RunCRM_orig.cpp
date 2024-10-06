@@ -57,7 +57,8 @@ int main() {
         TACSIsoShellConstitutive *con = new TACSIsoShellConstitutive(mat, thick);
 
         // now create the shell element object
-        TACSElement *shell = TacsCreateShellByName(descriptor, transform, con);
+        // TACSElement *shell = TacsCreateShellByName(descriptor, transform, con);
+        TACSElement *shell = new TACSQuad4ShellOrig(transform, con);
 
         // set the shell element into the mesh loader for that component
         mesh->setElement(icomp, shell);

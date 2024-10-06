@@ -188,11 +188,14 @@ void TACSIsoShellConstitutive::evalStress(int elemIndex, const double pt[],
   }
 }
 
+int TACSIsoShellConstitutive::symind(int irow, int icol, int N) {
+  // get the symind of a vector storage of symmat size N x N
+  return icol + (N+1)*N / 2 - (N+1-irow)*(N+1-irow-1)/2;
+};
+
 // Evaluate the stress
-void TACSIsoShellConstitutive::getABDmatrix(int elemIndex, const double pt[],
-                                          const TacsScalar X[],
-                                          TacsScalar ABD[]) {
-  TacsScalar ABD[45]; // sym part of 9x9 ABD matrix
+void TACSIsoShellConstitutive::getABDmatrix(int elemIndex, const double pt[], const TacsScalar X[], TacsScalar ABD[]) {
+  // TacsScalar ABD[45]; // sym part of 9x9 ABD matrix
   if (properties) {
     
     // compute submatrices in the ABD
@@ -226,11 +229,6 @@ void TACSIsoShellConstitutive::getABDmatrix(int elemIndex, const double pt[],
     //        [B, D, 0, 0],
     //        [0, 0, As, 0],
     //        [0, 0, 0, drill]]
-
-    int symind(int irow, int icol, int N) {
-      // get the symind of a vector storage of symmat size N x N
-      return icol + (N+1)*N / 2 - (N+1-irow)*(N+1-irow-1)/2;
-    };
 
     for (int irow = 0; irow < 9; irow++) {
       for (int icol = irow; icol < 9; icol++) {

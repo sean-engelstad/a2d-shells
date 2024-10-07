@@ -577,8 +577,7 @@ void TACSShellElement<quadrature, basis, director, model>::addJacobian(
 
   // Set the total number of tying points needed for this element
   TacsScalar ety[basis::NUM_TYING_POINTS];
-  model::template computeTyingStrain<vars_per_node, basis>(Xpts, fn, vars, d,
-                                                           ety);
+  model::template computeTyingStrain<vars_per_node, basis>(Xpts, fn, vars, d, ety);
 
   // Loop over each quadrature point and add the residual contribution
   for (int quad_index = 0; quad_index < nquad; quad_index++) {
@@ -771,10 +770,54 @@ void TACSShellElement<quadrature, basis, director, model>::addJacobian(
     A2D::Mat<TacsScalar, 6, 3> d2gtyd0;
     A2D::Mat<TacsScalar, 6, 6> d2gtyd0xi, d2gtyu0xi;
     strain_energy_stack.hextract(gty.pvalue(), d0.hvalue(), d2gtyd0); // should be able to get cross hessian A => B or B => A I believe
-    strain_energy_stack.hextract(gty.pvalue(), d0xi.hvalue(), d2gtyd0);
-    strain_energy_stack.hextract(gty.pvalue(), u0xi.hvalue(), d2gtyd0);
-    // TODO : make new routines for d2gtyX to the d2etyd, d2gtyd, d2etyu using basis stuff
-    // see TacsShellAddTypingDispCoupling and maybe use that..
+    strain_energy_stack.hextract(gty.pvalue(), d0xi.hvalue(), d2gtyd0xi);
+    strain_energy_stack.hextract(gty.pvalue(), u0xi.hvalue(), d2gtyu0xi);
+
+    // replace TacsShellAddTypingDispCoupling
+    // TODO : add basis steps to stack so this part goes away
+    TacsScalar d2gtyu[6 * usize], d2gtyd[6 * dsize];
+    memset(d2gtyu, 0, 6 * usize * sizeof(TacsScalar));
+    memset(d2gtyd, 0, 6 * dsize * sizeof(TacsScalar));
+    const int usize = 3 * basis::NUM_NODES;
+    const int dsize = 3 * basis::NUM_NODES;
+    for (int k = 0; k < 6; k++) {
+      // Compute the director field and the gradient of the director
+      // field at the specified point
+      basis::template addInterpFieldsTranspose<3, 3>(pt, d2gtyd0.get_data()[3 * k], &d2gtyd[dsize * k]);
+      basis::template addInterpFieldsGradTranspose<3, 3>(pt, d2gtyd0xi.get_data()[6 * k], &d2gtyd[dsize * k]);
+      basis::template addInterpFieldsGradTranspose<3, 3>(pt, d2gtyu0xi.get_data()[6 * k], &d2gtyu[usize * k]);
+    }
+
+    // Add the values into d2etyu and d2etyd
+    for (int k = 0; k < usize; k++) {
+      TacsScalar t1[6], t2[basis::NUM_TYING_POINTS];
+      memset(t2, 0, basis::NUM_TYING_POINTS * sizeof(TacsScalar));
+
+      for (int kk = 0; kk < 6; kk++) {
+        t1[kk] = d2gtyu[usize * kk + k];
+      }
+
+      basis::addInterpTyingStrainTranspose(pt, t1, t2);
+
+      for (int kk = 0; kk < basis::NUM_TYING_POINTS; kk++) {
+        d2etyu[kk * usize + k] += t2[kk];
+      }
+    }
+
+    for (int k = 0; k < dsize; k++) {
+      TacsScalar t1[6], t2[basis::NUM_TYING_POINTS];
+      memset(t2, 0, basis::NUM_TYING_POINTS * sizeof(TacsScalar));
+
+      for (int kk = 0; kk < 6; kk++) {
+        t1[kk] = d2gtyd[dsize * kk + k];
+      }
+
+      basis::addInterpTyingStrainTranspose(pt, t1, t2);
+
+      for (int kk = 0; kk < basis::NUM_TYING_POINTS; kk++) {
+        d2etyd[kk * dsize + k] += t2[kk];
+      }
+    }
 
     // setup before kinetic energy stack
     // ------------------------------------

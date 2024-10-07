@@ -131,13 +131,16 @@ int main() {
     // Assemble and factor the stiffness/Jacobian matrix. Factor the
     // Jacobian and solve the linear system for the displacements
     printf("Begin assemble Jacobian\n");
-    auto t1 = std::chrono::high_resolution_clock::now();
+    //auto t1 = std::chrono::high_resolution_clock::now();
+    double t1 = MPI_Wtime();
 
     double alpha = 1.0, beta = 0.0, gamma = 0.0;
     assembler->assembleJacobian(alpha, beta, gamma, NULL, matrix);
-
-    auto t2 = std::chrono::high_resolution_clock::now();
-    TacsScalar dt = std::chrono::duration_cast<std::chrono::milliseconds>(t2-t1).count() / 1000.0;
+ 
+    double t2 = MPI_Wtime();
+    //auto t2 = std::chrono::high_resolution_clock::now();
+    //TacsScalar dt = std::chrono::duration_cast<std::chrono::milliseconds>(t2-t1).count() / 1000.0;
+    double dt = t2 - t1;
     printf("Done with assemble Jacobian in %.8e sec\n", dt);
 
     // OPTIONAL test assembling the residuals

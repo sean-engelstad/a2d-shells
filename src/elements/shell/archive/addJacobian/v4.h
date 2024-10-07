@@ -1,3 +1,4 @@
+// 
 template <class quadrature, class basis, class director, class model>
 void TACSShellElement<quadrature, basis, director, model>::addJacobian(
     int elemIndex, double time, TacsScalar alpha, TacsScalar beta,
@@ -108,10 +109,11 @@ void TACSShellElement<quadrature, basis, director, model>::addJacobian(
 
     // passive variables for strain energy stack
     A2D::Vec<TacsScalar, 3> zero;
+    A2D::Mat<TacsScalar, 3, 3> Xd, Xdz, Xdinv, XdinvT;
 
     // active variables for strain energy stack
     A2D::A2DObj<TacsScalar> detXd, ES_dot, Uelem;
-    A2D::A2DObj<A2D::Mat<TacsScalar, 3, 3>> Xd, Xdz, Xdinv, XdinvT;
+    
     A2D::A2DObj<A2D::Vec<TacsScalar,9>> E, S;
     A2D::A2DObj<A2D::Mat<TacsScalar, 3, 3>> u0x_tmp, u1x_tmp1, u1x_tmp2, u1x_tmp3, u1x_term1, u1x_term2, u1x_sum; // temp variables
     A2D::A2DObj<A2D::Mat<TacsScalar, 3, 3>> u0xi_frame, u1xi_frame, u0x, u1x;
@@ -121,16 +123,21 @@ void TACSShellElement<quadrature, basis, director, model>::addJacobian(
 
     // printf("Pre strain energy stack\n");
 
-    // compute the strain energy from d0, d0xi, u0xi
-    auto strain_energy_stack = A2D::MakeStack(
-      // part 1 - compute shell basis and transform matrices (passive portion)
+    // TODO : fix order of MatRotateFrame (backwards)
+    auto prelim_coord_stack = A2D::MakeStack(
       A2D::ShellAssembleFrame(Xxi, n0, Xd), 
       A2D::ShellAssembleFrame(nxi, zero, Xdz), 
-      A2D::ShellAssembleFrame(u0xi, d0, u0xi_frame),
-      A2D::ShellAssembleFrame(d0xi, zero, u1xi_frame),
       A2D::MatInv(Xd, Xdinv),
       A2D::MatDet(Xd, detXd),
       A2D::MatMatMult(Xdinv, T, XdinvT),
+    ); // auto evaluates on runtime
+    // want this to not be included in Hessian/gradient backprop
+
+    // compute the strain energy from d0, d0xi, u0xi
+    auto strain_energy_stack = A2D::MakeStack(
+      // part 1 - compute shell basis and transform matrices (passive portion)
+      A2D::ShellAssembleFrame(u0xi, d0, u0xi_frame),
+      A2D::ShellAssembleFrame(d0xi, zero, u1xi_frame),
       // part 2 - compute u0x midplane disp gradient
       A2D::MatMatMult(u0xi_frame, Xdinv, u0x_tmp),
       A2D::MatRotateFrame(T, u0x_tmp, u0x),
@@ -175,58 +182,60 @@ void TACSShellElement<quadrature, basis, director, model>::addJacobian(
     // reverse mode 2nd order AD for the strain energy stack
     // -----------------------------------------------------
 
-    // backprop the drill strain to nodal level
-    A2D::Mat<TacsScalar,1,1> d2et;
-    strain_energy_stack.hzero(); // hextract was failing because can't call hzero on the stack..
-    strain_energy_stack.hextract(et.pvalue(), et.hvalue(), d2et);
-    basis::template addInterpFieldsOuterProduct<1, 1, 1, 1>(pt, d2et.get_data(), d2etn);
+    // d0, d0xi, u0xi, et, gty
+    const int ncomp = 22;
+    A2D::SymMat<TacsScalar, ncomp> hess;
+    auto in = A2D::MakeTieTuple<TacsScalar, A2D::ADseed::p>(d0, d0xi, u0xi, gty, et);
+    auto out = A2D::MakeTieTuple<TacsScalar, A2D::ADseed::h>(d0, d0xi, u0xi, gty, et);
+    strain_energy_stack.hextract(in, out, hess);
 
-    // replaces TacsShellAddDispGradHessian
+    // create submatrix Hessian matrices
+    A2D::Mat<TacsScalar,1,1> d2et;
     A2D::Mat<TacsScalar, 3, 3> d2d0;
     A2D::Mat<TacsScalar, 3, 6> d2d0d0xi, d2d0u0xi;
-    A2D::Mat<TacsScalar, 6, 6> d2d0xi, d2d0xiu0xi, d2u0xi;
+    A2D::Mat<TacsScalar, 6, 3> d2gtyd0;
+    A2D::Mat<TacsScalar, 6, 6> d2d0xi, d2d0xiu0xi, d2u0xi, d2gty, d2gtyd0xi, d2gtyu0xi;
 
-    // hardcode hextract_multi() call to be more computationally efficient
-    // would be cool if there was a way to use a tuple like : strain_energy_stack.hextract_multi(d0.pvalue(), Tuple(d0.hvalue(), d0xi.hvalue(), u0xi.hvalue()), Tuple(d2d0, d2d0xi, d2u0xi))
-    // replaces::
-    // strain_energy_stack.hextract(d0.pvalue(), d0.hvalue(), d2d0);
-    // strain_energy_stack.hextract(d0.pvalue(), d0xi.hvalue(), d2d0d0xi);
-    // strain_energy_stack.hextract(d0.pvalue(), u0xi.hvalue(), d2d0u0xi);
-    for (A2D::index_t id0 = 0; id0 < 3; id0++) {
-      d0.pvalue().zero();
-      d0.hvalue().zero(); d0xi.hvalue().zero(); u0xi.hvalue().zero();
-      strain_energy_stack.hzero();
-      d0.pvalue()[id0] = 1.0;
-      strain_energy_stack.hforward();
-      strain_energy_stack.hreverse();
-      for (A2D::index_t jd0 = 0; jd0 < 3; jd0++) {
-        d2d0[id0, jd0] = d0.hvalue()[jd0];
-      }
-      for (A2D::index_t i6 = 0; i6 < 6; i6++) {
-        d2d0d0xi[id0, i6] = d0xi.hvalue()[i6];
-        d2d0u0xi[id0, i6] = u0xi.hvalue()[i6];
-      }
-    }
+    // copy values from full hessian into submatrix-Hessians
+    // could add A2D routines to extract submatrices in the future using upper, lower bounds maybe?
+    for (int irow = 0; irow < 22; irow++) {
+      for (int icol = 0; icol < 22; icol++) {
+        // start of large irow if block
+        if (0 <= irow && irow < 3) { // d0 rows
+          if (0 <= icol && icol < 3) { // d0 cols
+            d2d0(irow, icol) = hess(irow,icol);
+          } else if (3 <= icol && icol < 9) { // d0xi cols
+            d2d0d0xi(irow, icol-3) = hess(irow,icol);
+          } else if (9 <= icol && icol < 15) { // u0xi cols
+            d2d0xiu0xi(irow, icol-9) = hess(irow, icol);
+          }
+        } else if (3 <= irow && irow < 9) { // d0xi rows
+          if (3 <= icol && icol < 9) { // d0xi cols
+            d2d0xi(irow-3, icol-3) = hess(irow,icol);
+          } else if (9 <= icol && icol < 15) { // u0xi calls
+            d2d0xiu0xi(irow-3, icol-9) = hess(irow,icol);
+          }
+        } else if (9 <= irow && irow < 15) { // u0xi rows
+          if (9 <= icol && icol < 15) { // u0xi cols
+            d2u0xi(irow-9, icol-9) = hess(irow,icol);
+          }
+        } else if (15 <= irow && irow < 21) { // gty rows
+          if (0 <= icol && icol < 3) { // d0 cols
+            d2gtyd0(irow, icol-15) = hess(irow,icol);
+          } else if (3 <= icol && icol < 9) { // d0xi cols
+            d2gtyd0xi(irow-15, icol-3) = hess(irow,icol);
+          } else if (9 <= icol && icol < 15) { // u0xi cols
+            d2gtyu0xi(irow-15, icol-9) = hess(irow,icol);
+          } else if (15 <= icol && icol < 22) { // gty cols
+            d2gty(irow-15, icol-15) = hess(irow, icol);
+          }
+        } // done with large irow if block 
+      } // end of icol for loop
+    } // end of icol for loop
+    d2et(0,0) = hess(21, 21);
 
-    // could be : strain_energy_stack.hextract_multi(d0xi.pvalue(), Tuple(d0xi.hvalue(), u0xi.hvalue()), Tuple(d2d0xi, d2d0xiu0xi))
-    // replaces:
-    // strain_energy_stack.hextract(d0xi.pvalue(), d0xi.hvalue(), d2d0xi);
-    // strain_energy_stack.hextract(d0xi.pvalue(), u0xi.hvalue(), d2d0xiu0xi);
-    for (A2D::index_t id0xi = 0; id0xi < 6; id0xi++) {
-      d0xi.pvalue().zero();
-      d0xi.hvalue().zero(); u0xi.hvalue().zero();
-      strain_energy_stack.hzero();
-      d0xi.pvalue()[id0xi] = 1.0;
-      strain_energy_stack.hforward();
-      strain_energy_stack.hreverse();
-      for (A2D::index_t jd0xi = 0; jd0xi < 6; jd0xi++) {
-        d2d0xi[id0xi, jd0xi] = d0xi.hvalue()[jd0xi];
-        d2d0xiu0xi[id0xi, jd0xi] = u0xi.hvalue()[jd0xi];
-      }
-    }
-    
-    strain_energy_stack.hextract(u0xi.pvalue(), u0xi.hvalue(), d2u0xi);
-
+    // Hessian backprop from quad level to nodes level
+    basis::template addInterpFieldsOuterProduct<1, 1, 1, 1>(pt, d2et.get_data(), d2etn);
     basis::template addInterpFieldsOuterProduct<3, 3, 3, 3>(pt, d2d0.get_data(), d2d);
     basis::template addInterpGradOuterProduct<3, 3, 3, 3>(pt, d2d0xi.get_data(), d2d);
     basis::template addInterpGradMixedOuterProduct<3, 3, 3, 3>(pt, d2d0d0xi.get_data(), d2d0d0xi.get_data(), d2d);
@@ -235,37 +244,7 @@ void TACSShellElement<quadrature, basis, director, model>::addJacobian(
     if (mat) {
       basis::template addInterpGradOuterProduct<vars_per_node, vars_per_node, 3, 3>(pt, d2u0xi.get_data(), mat);
     }
-
-    // replaces addInterpTyingStrainHessian
-    A2D::Mat<TacsScalar, 6, 6> d2gty;
-    strain_energy_stack.hextract(gty.pvalue(), gty.hvalue(), d2gty);
-    basis::addInterpTyingStrainHessian(pt, d2gty.get_data(), d2ety);
-
-    // replaces TacsShellAddTypingDispCoupling
-    A2D::Mat<TacsScalar, 6, 3> d2gtyd0;
-    A2D::Mat<TacsScalar, 6, 6> d2gtyd0xi, d2gtyu0xi;
-    // use hextract_multi call here..
-    // replaces::
-    // strain_energy_stack.hextract(gty.pvalue(), d0.hvalue(), d2gtyd0); // should be able to get cross hessian A => B or B => A I believe
-    // strain_energy_stack.hextract(gty.pvalue(), d0xi.hvalue(), d2gtyd0xi);
-    // strain_energy_stack.hextract(gty.pvalue(), u0xi.hvalue(), d2gtyu0xi);
-    for (A2D::index_t igty = 0; igty < 6; igty++) {
-      gty.pvalue().zero();
-      d0.hvalue().zero(); d0xi.hvalue().zero(); u0xi.hvalue().zero();
-      strain_energy_stack.hzero();
-      gty.pvalue()[igty] = 1.0;
-      strain_energy_stack.hforward();
-      strain_energy_stack.hreverse();
-      for (A2D::index_t jd0 = 0; jd0 < 3; jd0++) {
-        d2gtyd0[igty, jd0] = d0.hvalue()[jd0];
-      }
-      for (A2D::index_t j = 0; j < 6; j++) {
-        d2gtyd0xi[igty, j] = d0xi.hvalue()[j];
-        d2gtyu0xi[igty, j] = u0xi.hvalue()[j];
-      }
-    }
-    
-
+    basis::addInterpTyingStrainHessian(pt, d2gty.get_data(), d2ety);  
     TacsShellAddTyingDispCouplingPostStack<basis>(pt, 
       d2gtyd0.get_data(), d2gtyd0xi.get_data(), d2gtyu0xi.get_data(), 
       d2etyu, d2etyd);

@@ -7,6 +7,10 @@
 #include "TACSIsoShellConstitutive.h"
 #include "TACSShellElementDefs.h"
 
+#include <iostream>
+#include <chrono>
+#include <thread>
+
 // this example is based off of examples/crm/crm.cpp in TACS
 
 int main() {
@@ -126,9 +130,15 @@ int main() {
 
     // Assemble and factor the stiffness/Jacobian matrix. Factor the
     // Jacobian and solve the linear system for the displacements
+    printf("Begin assemble Jacobian\n");
+    auto t1 = std::chrono::high_resolution_clock::now();
+
     double alpha = 1.0, beta = 0.0, gamma = 0.0;
     assembler->assembleJacobian(alpha, beta, gamma, NULL, matrix);
-    printf("Done with assemble Jacobian\n");
+
+    auto t2 = std::chrono::high_resolution_clock::now();
+    TacsScalar dt = std::chrono::duration_cast<std::chrono::milliseconds>(t2-t1).count() / 1000.0;
+    printf("Done with assemble Jacobian in %.8e sec\n", dt);
 
     // OPTIONAL test assembling the residuals
     // bool test_res = true; // doesn't use in solve but just to see if code works.

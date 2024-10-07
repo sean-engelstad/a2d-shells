@@ -528,7 +528,7 @@ void TACSShellElement<quadrature, basis, director, model>::addJacobian(
   // Compute the number of quadrature points
   const int nquad = quadrature::getNumQuadraturePoints();
 
-  printf("Begin addJacobian.. \n");
+  // printf("Begin addJacobian.. \n");
 
   // Derivative of the director field
   TacsScalar dd[dsize];
@@ -595,42 +595,15 @@ void TACSShellElement<quadrature, basis, director, model>::addJacobian(
     A2D::Vec<TacsScalar,3> X, n0;
     A2D::Mat<TacsScalar,3,2> Xxi, nxi;
     A2D::Mat<TacsScalar,3,3> T;
-    // A2D::SymMat<TacsScalar,3> gty;
     
     // active A2D objs used in interpolation
     A2D::A2DObj<A2D::Vec<TacsScalar,1>> et;
     A2D::A2DObj<A2D::Vec<TacsScalar,3>> d0;
     A2D::A2DObj<A2D::Mat<TacsScalar,3,2>> d0xi, u0xi;
-    A2D::A2DObj<A2D::SymMat<TacsScalar,3>> e0ty, e0ty_tmp, gty;
-
-    // NOTE : try this section later after get other parts to work..
-    // // new interpolation specific objects and its own mini stack (which I will combine with strain energy stack later)
-    // A2D::Vec<TacsScalar, 1> interp1;
-    // A2D::Vec<TacsScalar, 3> interp3;
-    // A2D::Mat<TacsScalar, 3, 2> interp3Grad;
-
-    // // am I doing this part right? (Fix later prob remove underscores or something and define earlier)
-    // A2D::Mat<TacsScalar, 3, 4> _Xpts(&Xpts), _fn(&fn), _d(&d);
-    // A2D::Mat<TacsScalar, 1, 4> _etn(&etn); 
-
-    // basis::template getInterpFields<1,1>(pt, interp1.get_data()); // TODO : make routines for these
-    // basis::template getInterpFields<3,3>(pt, interp3.get_data());
-    // basis::template getInterpFieldsGrad<3,3>(pt, interp3Grad.get_data());
-
-    // auto interp_stack = A2D::MakeStack(
-    //   MatVecMult(etn, interp1, et),
-    //   MatVecMult(Xpts, interp3, X),
-    //   MatVecMult(fn, interp3, n0),
-    //   MatVecMult(d, intepr3, d0),
-    //   MatMatMult(Xpts, interp3Grad, Xxi),
-    //   MatMatMult(fn, interp3Grad, nxi),
-    //   MatMatMult(d, interp3Grad, d0xi),
-    //   MatMatMult(vars, interp3Grad, u0xi)
-    //   // TODO : Tying strain one ?
-    // )
-    
+    A2D::A2DObj<A2D::SymMat<TacsScalar,3>> e0ty, e0ty_tmp, gty;    
 
     // interpolate coordinates, director, midplane displacements with the basis
+    // tried interpolating U,d => d0, d0xi, u0xi in main stack, but this doesn't help much because need d2gtyu0xi somewhere else
     basis::template interpFields<3, 3>(pt, Xpts, X.get_data());
     basis::template interpFields<3, 3>(pt, fn, n0.get_data());
     basis::template interpFields<1, 1>(pt, etn, et.value().get_data());
@@ -641,6 +614,7 @@ void TACSShellElement<quadrature, basis, director, model>::addJacobian(
     basis::template interpFieldsGrad<3, 3>(pt, d, d0xi.value().get_data());
     basis::template interpFieldsGrad<vars_per_node, 3>(pt, vars, u0xi.value().get_data());
 
+    // too hard to interpolate since different # of tying points for each gij entry
     basis::interpTyingStrain(pt, ety, gty.value().get_data());
 
     // setup before A2D strain energy stack
@@ -721,16 +695,6 @@ void TACSShellElement<quadrature, basis, director, model>::addJacobian(
 
     // reverse mode 2nd order AD for the strain energy stack
     // -----------------------------------------------------
-    
-    // see extractJacobian() => I think I can adapt that to get the Jacobians
-    // with special calls on pvalue => hvalue to get the Jacobians (test it out)
-    // also I can try to code it up myself with unit vectors if I need to as well
-    // expect to get cross-hessians is you pvalue one and hvalue the other obj
-    //  NOTE : Jacobian or Hessian terms just need to be setup as matrices based on hextract 
-    
-    // TODO : could this be made more efficient by extracting multiple Jacobians at the same time with a tuple?
-    // e.g. if I pvalue() the same thing multiple times and want to get out the hvalue() for several different things
-    // could make a new routine for hextract_multi() or something that takes a tuple.. (less calls then)
 
     // backprop the drill strain to nodal level
     A2D::Mat<TacsScalar,1,1> d2et;
@@ -743,12 +707,45 @@ void TACSShellElement<quadrature, basis, director, model>::addJacobian(
     A2D::Mat<TacsScalar, 3, 6> d2d0d0xi, d2d0u0xi;
     A2D::Mat<TacsScalar, 6, 6> d2d0xi, d2d0xiu0xi, d2u0xi;
 
-    // TODO : could make new hextract_multi(...,) with VarTuple/vector for second arg so one call for repeat pvalue inputs
-    strain_energy_stack.hextract(d0.pvalue(), d0.hvalue(), d2d0);
-    strain_energy_stack.hextract(d0.pvalue(), d0xi.hvalue(), d2d0d0xi);
-    strain_energy_stack.hextract(d0.pvalue(), u0xi.hvalue(), d2d0u0xi);
-    strain_energy_stack.hextract(d0xi.pvalue(), d0xi.hvalue(), d2d0xi);
-    strain_energy_stack.hextract(d0xi.pvalue(), u0xi.hvalue(), d2d0xiu0xi);
+    // hardcode hextract_multi() call to be more computationally efficient
+    // would be cool if there was a way to use a tuple like : strain_energy_stack.hextract_multi(d0.pvalue(), Tuple(d0.hvalue(), d0xi.hvalue(), u0xi.hvalue()), Tuple(d2d0, d2d0xi, d2u0xi))
+    // replaces::
+    // strain_energy_stack.hextract(d0.pvalue(), d0.hvalue(), d2d0);
+    // strain_energy_stack.hextract(d0.pvalue(), d0xi.hvalue(), d2d0d0xi);
+    // strain_energy_stack.hextract(d0.pvalue(), u0xi.hvalue(), d2d0u0xi);
+    for (A2D::index_t id0 = 0; id0 < 3; id0++) {
+      d0.pvalue().zero();
+      d0.hvalue().zero(); d0xi.hvalue().zero(); u0xi.hvalue().zero();
+      strain_energy_stack.hzero();
+      d0.pvalue()[id0] = 1.0;
+      strain_energy_stack.hforward();
+      strain_energy_stack.hreverse();
+      for (A2D::index_t jd0 = 0; jd0 < 3; jd0++) {
+        d2d0[id0, jd0] = d0.hvalue()[jd0];
+      }
+      for (A2D::index_t i6 = 0; i6 < 6; i6++) {
+        d2d0d0xi[id0, i6] = d0xi.hvalue()[i6];
+        d2d0u0xi[id0, i6] = u0xi.hvalue()[i6];
+      }
+    }
+
+    // could be : strain_energy_stack.hextract_multi(d0xi.pvalue(), Tuple(d0xi.hvalue(), u0xi.hvalue()), Tuple(d2d0xi, d2d0xiu0xi))
+    // replaces:
+    // strain_energy_stack.hextract(d0xi.pvalue(), d0xi.hvalue(), d2d0xi);
+    // strain_energy_stack.hextract(d0xi.pvalue(), u0xi.hvalue(), d2d0xiu0xi);
+    for (A2D::index_t id0xi = 0; id0xi < 6; id0xi++) {
+      d0xi.pvalue().zero();
+      d0xi.hvalue().zero(); u0xi.hvalue().zero();
+      strain_energy_stack.hzero();
+      d0xi.pvalue()[id0xi] = 1.0;
+      strain_energy_stack.hforward();
+      strain_energy_stack.hreverse();
+      for (A2D::index_t jd0xi = 0; jd0xi < 6; jd0xi++) {
+        d2d0xi[id0xi, jd0xi] = d0xi.hvalue()[jd0xi];
+        d2d0xiu0xi[id0xi, jd0xi] = u0xi.hvalue()[jd0xi];
+      }
+    }
+    
     strain_energy_stack.hextract(u0xi.pvalue(), u0xi.hvalue(), d2u0xi);
 
     basis::template addInterpFieldsOuterProduct<3, 3, 3, 3>(pt, d2d0.get_data(), d2d);
@@ -766,58 +763,33 @@ void TACSShellElement<quadrature, basis, director, model>::addJacobian(
     basis::addInterpTyingStrainHessian(pt, d2gty.get_data(), d2ety);
 
     // replaces TacsShellAddTypingDispCoupling
-    // double check this (not quite right probably)
     A2D::Mat<TacsScalar, 6, 3> d2gtyd0;
     A2D::Mat<TacsScalar, 6, 6> d2gtyd0xi, d2gtyu0xi;
-    strain_energy_stack.hextract(gty.pvalue(), d0.hvalue(), d2gtyd0); // should be able to get cross hessian A => B or B => A I believe
-    strain_energy_stack.hextract(gty.pvalue(), d0xi.hvalue(), d2gtyd0xi);
-    strain_energy_stack.hextract(gty.pvalue(), u0xi.hvalue(), d2gtyu0xi);
-
-    // replace TacsShellAddTypingDispCoupling
-    // TODO : add basis steps to stack so this part goes away
-    TacsScalar d2gtyu[6 * usize], d2gtyd[6 * dsize];
-    memset(d2gtyu, 0, 6 * usize * sizeof(TacsScalar));
-    memset(d2gtyd, 0, 6 * dsize * sizeof(TacsScalar));
-    const int usize = 3 * basis::NUM_NODES;
-    const int dsize = 3 * basis::NUM_NODES;
-    for (int k = 0; k < 6; k++) {
-      // Compute the director field and the gradient of the director
-      // field at the specified point
-      basis::template addInterpFieldsTranspose<3, 3>(pt, d2gtyd0.get_data()[3 * k], &d2gtyd[dsize * k]);
-      basis::template addInterpFieldsGradTranspose<3, 3>(pt, d2gtyd0xi.get_data()[6 * k], &d2gtyd[dsize * k]);
-      basis::template addInterpFieldsGradTranspose<3, 3>(pt, d2gtyu0xi.get_data()[6 * k], &d2gtyu[usize * k]);
-    }
-
-    // Add the values into d2etyu and d2etyd
-    for (int k = 0; k < usize; k++) {
-      TacsScalar t1[6], t2[basis::NUM_TYING_POINTS];
-      memset(t2, 0, basis::NUM_TYING_POINTS * sizeof(TacsScalar));
-
-      for (int kk = 0; kk < 6; kk++) {
-        t1[kk] = d2gtyu[usize * kk + k];
+    // use hextract_multi call here..
+    // replaces::
+    // strain_energy_stack.hextract(gty.pvalue(), d0.hvalue(), d2gtyd0); // should be able to get cross hessian A => B or B => A I believe
+    // strain_energy_stack.hextract(gty.pvalue(), d0xi.hvalue(), d2gtyd0xi);
+    // strain_energy_stack.hextract(gty.pvalue(), u0xi.hvalue(), d2gtyu0xi);
+    for (A2D::index_t igty = 0; igty < 6; igty++) {
+      gty.pvalue().zero();
+      d0.hvalue().zero(); d0xi.hvalue().zero(); u0xi.hvalue().zero();
+      strain_energy_stack.hzero();
+      gty.pvalue()[igty] = 1.0;
+      strain_energy_stack.hforward();
+      strain_energy_stack.hreverse();
+      for (A2D::index_t jd0 = 0; jd0 < 3; jd0++) {
+        d2gtyd0[igty, jd0] = d0.hvalue()[jd0];
       }
-
-      basis::addInterpTyingStrainTranspose(pt, t1, t2);
-
-      for (int kk = 0; kk < basis::NUM_TYING_POINTS; kk++) {
-        d2etyu[kk * usize + k] += t2[kk];
+      for (A2D::index_t j = 0; j < 6; j++) {
+        d2gtyd0xi[igty, j] = d0xi.hvalue()[j];
+        d2gtyu0xi[igty, j] = u0xi.hvalue()[j];
       }
     }
+    
 
-    for (int k = 0; k < dsize; k++) {
-      TacsScalar t1[6], t2[basis::NUM_TYING_POINTS];
-      memset(t2, 0, basis::NUM_TYING_POINTS * sizeof(TacsScalar));
-
-      for (int kk = 0; kk < 6; kk++) {
-        t1[kk] = d2gtyd[dsize * kk + k];
-      }
-
-      basis::addInterpTyingStrainTranspose(pt, t1, t2);
-
-      for (int kk = 0; kk < basis::NUM_TYING_POINTS; kk++) {
-        d2etyd[kk * dsize + k] += t2[kk];
-      }
-    }
+    TacsShellAddTyingDispCouplingPostStack<basis>(pt, 
+      d2gtyd0.get_data(), d2gtyd0xi.get_data(), d2gtyu0xi.get_data(), 
+      d2etyu, d2etyd);
 
     // setup before kinetic energy stack
     // ------------------------------------
@@ -899,7 +871,7 @@ void TACSShellElement<quadrature, basis, director, model>::addJacobian(
                                                num_nodes>(alpha, vars, res,
                                                           mat);
 
-  printf("Done with addJacobian on elem %d\n", elemIndex);
+  // printf("Done with addJacobian on elem %d\n", elemIndex);
 }
 
 template <class quadrature, class basis, class director, class model>

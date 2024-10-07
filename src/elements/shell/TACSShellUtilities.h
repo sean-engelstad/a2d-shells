@@ -945,6 +945,58 @@ void TacsShellAddDrillStrainHessian(
   }
 }
 
+template <class basis>
+void TacsShellAddTyingDispCouplingPostStack(const double pt[], 
+                                   TacsScalar d2gtyd0[], 
+                                   TacsScalar d2gtyd0xi[], TacsScalar d2gtyu0xi[],
+                                   TacsScalar d2etyu[], TacsScalar d2etyd[]) {
+  // replace TacsShellAddTypingDispCoupling
+  // make this whole step into a basis routine..
+  const int usize = 3 * basis::NUM_NODES;
+  const int dsize = 3 * basis::NUM_NODES;
+  TacsScalar d2gtyu[6 * usize], d2gtyd[6 * dsize];
+  memset(d2gtyu, 0, 6 * usize * sizeof(TacsScalar));
+  memset(d2gtyd, 0, 6 * dsize * sizeof(TacsScalar));
+  for (int k = 0; k < 6; k++) {
+    // Compute the director field and the gradient of the director
+    // field at the specified point
+    basis::template addInterpFieldsTranspose<3, 3>(pt, &d2gtyd0[3 * k], &d2gtyd[dsize * k]);
+    basis::template addInterpFieldsGradTranspose<3, 3>(pt, &d2gtyd0xi[6 * k], &d2gtyd[dsize * k]);
+    basis::template addInterpFieldsGradTranspose<3, 3>(pt, &d2gtyu0xi[6 * k], &d2gtyu[usize * k]);
+  }
+
+  // Add the values into d2etyu and d2etyd
+  for (int k = 0; k < usize; k++) {
+    TacsScalar t1[6], t2[basis::NUM_TYING_POINTS];
+    memset(t2, 0, basis::NUM_TYING_POINTS * sizeof(TacsScalar));
+
+    for (int kk = 0; kk < 6; kk++) {
+      t1[kk] = d2gtyu[usize * kk + k];
+    }
+
+    basis::addInterpTyingStrainTranspose(pt, t1, t2);
+
+    for (int kk = 0; kk < basis::NUM_TYING_POINTS; kk++) {
+      d2etyu[kk * usize + k] += t2[kk];
+    }
+  }
+
+  for (int k = 0; k < dsize; k++) {
+    TacsScalar t1[6], t2[basis::NUM_TYING_POINTS];
+    memset(t2, 0, basis::NUM_TYING_POINTS * sizeof(TacsScalar));
+
+    for (int kk = 0; kk < 6; kk++) {
+      t1[kk] = d2gtyd[dsize * kk + k];
+    }
+
+    basis::addInterpTyingStrainTranspose(pt, t1, t2);
+
+    for (int kk = 0; kk < basis::NUM_TYING_POINTS; kk++) {
+      d2etyd[kk * dsize + k] += t2[kk];
+    }
+  }
+}
+
 /**
   Add/accumulate the contribution to the Jacobians from the coupling between the
   tying strain and the displacement gradient

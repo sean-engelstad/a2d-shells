@@ -102,6 +102,10 @@ int main(int argc, char *argv[]) {
     TACSSchurPc *pc = new TACSSchurPc(kmat, lev, fill, reorder_schur);
     pc->incref();
 
+    // optional other preconditioner settings?
+    assembler->assembleMatType(TACS_STIFFNESS_MATRIX, kmat);
+    assembler->assembleMatType(TACS_GEOMETRIC_STIFFNESS_MATRIX, gmat);
+
     int subspaceSize = 10, nrestarts = 15, isFlexible = 0;
     GMRES *solver = new GMRES(aux_mat, pc, subspaceSize, nrestarts, isFlexible);
     solver->incref();
@@ -109,9 +113,30 @@ int main(int argc, char *argv[]) {
     // set relative tolerances
     solver->setTolerances(1e-12, 1e-12);
 
+    // solve the linear static analysis
+    // Create matrix and vectors
+    TACSBVec *res = assembler->createVec();  // The residual
+    res->incref();
+    assembler->applyBCs(res);
+    assembler->assembleJacobian(1.0, 0.0, 0.0, res, kmat);
+    pc->factor();  // LU factorization of stiffness matrix
+    pc->applyFactor(res, u0);
+    u0->scale(-1.0);
+    assembler->setVariables(u0);
+    // Output for visualization
+    ElementType etype = TACS_BEAM_OR_SHELL_ELEMENT;
+    int write_flag = (TACS_OUTPUT_NODES | TACS_OUTPUT_CONNECTIVITY |
+                        TACS_OUTPUT_DISPLACEMENTS | TACS_OUTPUT_STRAINS |
+                        TACS_OUTPUT_STRESSES | TACS_OUTPUT_EXTRAS);
+    TACSToFH5 *f5 = new TACSToFH5(assembler, etype, write_flag);
+    f5->incref();
+    f5->writeToFile("cylinder_solution.f5");
+    // return 0;
+
+
     // make the buckling solver
-    TacsScalar sigma = 100.0;
-    int max_lanczos_vecs = 100, num_eigvals = 20; // num_eigvals = 50;
+    TacsScalar sigma = 10.0;
+    int max_lanczos_vecs = 300, num_eigvals = 50; // num_eigvals = 50;
      // need high enough # eigvals to get it right
     double eig_tol = 1e-12;
 
@@ -128,12 +153,12 @@ int main(int argc, char *argv[]) {
     buckling->solve(f, u0, ksm_print);
 
     // Create an TACSToFH5 object for writing output to files
-    int write_flag = (TACS_OUTPUT_CONNECTIVITY | TACS_OUTPUT_NODES |
-                        TACS_OUTPUT_DISPLACEMENTS | TACS_OUTPUT_STRAINS |
-                        TACS_OUTPUT_STRESSES | TACS_OUTPUT_EXTRAS);
-    TACSToFH5 *f5 =
-        new TACSToFH5(assembler, TACS_BEAM_OR_SHELL_ELEMENT, write_flag);
-    f5->incref();
+    // int write_flag = (TACS_OUTPUT_CONNECTIVITY | TACS_OUTPUT_NODES |
+    //                     TACS_OUTPUT_DISPLACEMENTS | TACS_OUTPUT_STRAINS |
+    //                     TACS_OUTPUT_STRESSES | TACS_OUTPUT_EXTRAS);
+    // TACSToFH5 *f5 =
+        // new TACSToFH5(assembler, TACS_BEAM_OR_SHELL_ELEMENT, write_flag);
+    // f5->incref();
 
     // write each of the buckling modes to a file
     

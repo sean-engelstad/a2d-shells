@@ -111,10 +111,12 @@ int main() {
     assembler->getDesignVars(x);
 
     // Create matrix and vectors
-    TACSBVec *u0 = assembler->createVec();  // displacements and rotations
-    TACSBVec *f = assembler->createVec();    // loads
-    u0->incref();
-    f->incref();
+    TACSBVec *u0 = NULL;  // displacements and rotations
+    TACSBVec *f = NULL;    // loads
+    // NOTE : if you want to do linearized buckling about arbitrary disps
+    // then you should do linear static yourself and then give the TACSLinearBuckling your u0
+    // u0->incref();
+    // f->incref();
 
     // create the matrices for buckling
     TACSSchurMat *kmat = assembler->createSchurMat();  // stiffness matrix

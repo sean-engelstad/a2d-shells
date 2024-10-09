@@ -113,25 +113,30 @@ int main(int argc, char *argv[]) {
     // set relative tolerances
     solver->setTolerances(1e-12, 1e-12);
 
-    // solve the linear static analysis
-    // Create matrix and vectors
-    TACSBVec *res = assembler->createVec();  // The residual
-    res->incref();
-    assembler->applyBCs(res);
-    assembler->assembleJacobian(1.0, 0.0, 0.0, res, kmat);
-    pc->factor();  // LU factorization of stiffness matrix
-    pc->applyFactor(res, u0);
-    u0->scale(-1.0);
-    assembler->setVariables(u0);
-    // Output for visualization
-    ElementType etype = TACS_BEAM_OR_SHELL_ELEMENT;
-    int write_flag = (TACS_OUTPUT_NODES | TACS_OUTPUT_CONNECTIVITY |
-                        TACS_OUTPUT_DISPLACEMENTS | TACS_OUTPUT_STRAINS |
-                        TACS_OUTPUT_STRESSES | TACS_OUTPUT_EXTRAS);
-    TACSToFH5 *f5 = new TACSToFH5(assembler, etype, write_flag);
-    f5->incref();
-    f5->writeToFile("cylinder_solution.f5");
-    // return 0;
+    // solve the linear static analysis for u0 and set f to NULL
+    // f = NULL;
+    // // Create matrix and vectors
+    // TACSBVec *res = assembler->createVec();  // The residual
+    // res->incref();
+    // assembler->applyBCs(res);
+    // assembler->assembleJacobian(1.0, 0.0, 0.0, res, kmat);
+    // pc->factor();  // LU factorization of stiffness matrix
+    // pc->applyFactor(res, u0);
+    // u0->scale(-1.0);
+    // assembler->setVariables(u0);
+    // // Output for visualization
+    // ElementType etype = TACS_BEAM_OR_SHELL_ELEMENT;
+    // int write_flag = (TACS_OUTPUT_NODES | TACS_OUTPUT_CONNECTIVITY |
+    //                     TACS_OUTPUT_DISPLACEMENTS | TACS_OUTPUT_STRAINS |
+    //                     TACS_OUTPUT_STRESSES | TACS_OUTPUT_EXTRAS);
+    // TACSToFH5 *f5 = new TACSToFH5(assembler, etype, write_flag);
+    // f5->incref();
+    // f5->writeToFile("cylinder_solution.f5");
+    // // return 0;
+
+    // OR instead of solving linear static:
+    //   set u0, f to NULL and it will solve it for you
+    u0 = NULL; f = NULL;
 
 
     // make the buckling solver

@@ -22,13 +22,23 @@ int main(int argc, char *argv[]) {
 
     // Parameters optionally set from the command line
     int order = 2;
-    int nx = 100, ny = 100;
-    int mesh_type = 0;
 
     double t = 0.002; // m 
     double L = 0.4; // m
     double R = 0.2; // m
     double udisp = -1e-5; // compressive udisp
+
+    // select nelems and it will select to retain isotropic elements (good element AR)
+    // want dy = 2 * pi * R / ny the hoop elem spacing to be equal dx = L / nx the axial elem spacing
+    // and want to choose # elems so that elements have good elem AR
+    int nelems = 3500; // target (does round stuff)
+    double pi = 3.14159265;
+    double A = L / 2.0 / pi / R;
+    double temp1 = sqrt(nelems * 1.0 / A);
+    int ny = (int)temp1;
+    double temp2 = A * ny;
+    int nx = (int)temp2;
+    printf("nx = %d, ny = %d\n", nx, ny);
 
     TacsScalar rho = 2700.0;
     TacsScalar specific_heat = 921.096;
@@ -51,7 +61,7 @@ int main(int argc, char *argv[]) {
     TACSElement *shell = NULL;
     shell = new TACSQuad4Shell(transform, con);
     shell->incref();
-    createAssembler(comm, order, nx, ny, udisp, shell, &assembler, &creator);
+    createAssembler(comm, order, nx, ny, udisp, L, R, shell, &assembler, &creator);
 
     // set temperature into all elements for thermal buckling
     // set to 0 for mechanical buckling
@@ -99,11 +109,9 @@ int main(int argc, char *argv[]) {
     // set relative tolerances
     solver->setTolerances(1e-12, 1e-12);
 
-    // TODO : need to increase tolerances in the GMRES solver.. (see bucklingProb in python L2Convergence and setTolerances in GMRES)
-
     // make the buckling solver
-    TacsScalar sigma = 10.0;
-    int max_lanczos_vecs = 100, num_eigvals = 5; // num_eigvals = 50;
+    TacsScalar sigma = 100.0;
+    int max_lanczos_vecs = 100, num_eigvals = 20; // num_eigvals = 50;
      // need high enough # eigvals to get it right
     double eig_tol = 1e-12;
 

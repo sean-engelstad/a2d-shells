@@ -1,22 +1,21 @@
 #pragma once
 
+// NOTE : on lines 76-100, I changed removed the rotx BCs from the BC set
+// since this might have been affecting the buckling mode solution..
+
 /*
   Create the TACSAssembler object and return the associated TACS
   creator object
 */
 void createAssembler(MPI_Comm comm, int order, int nx, int ny, TacsScalar udisp,
+                     TacsScalar length, TacsScalar radius,
                      TACSElement *element, TACSAssembler **_assembler,
                      TACSCreator **_creator) {
   int rank;
   MPI_Comm_rank(comm, &rank);
 
-  double L = 100.0;
-  double R = 100.0 / M_PI;
-  double defect = 0.1;
-
-  // Set the alpha and beta parameters
-  double alpha = 4.0 / R;
-  double beta = 3 * M_PI / L;
+  double L = length;
+  double R = radius;
 
   // Set the number of nodes/elements on this proc
   int varsPerNode = element->getVarsPerNode();
@@ -72,17 +71,20 @@ void createAssembler(MPI_Comm comm, int order, int nx, int ny, TacsScalar udisp,
     int k = 0;
 
     int *bc_ptr = new int[numBcs + 1];
-    int *bc_vars = new int[4 * numBcs];
-    TacsScalar *bc_vals = new TacsScalar[4 * numBcs];
+    int *bc_vars = new int[3 * numBcs];
+    TacsScalar *bc_vals = new TacsScalar[3 * numBcs];
     bc_ptr[0] = 0;
     int i = 0; // BC counter
 
+    // previously had u, v, w, rotx but that doesn't bode well for the buckling problem
+    // maybe should only constrain rotation at like 1 point or so
+    // if do want rotx constrained, then you should set 4 * numBCs instead of 3 * numBCs above and loop to m < 4
     for (int j = 0; j < nny; j++) { // set u, v, w, xrot to zero
       // bc at x- edge
       bc_ptr[i+1] = bc_ptr[i]; // start BC dof counter
       int node = j * nnx;
       bcNodes[k] = node;
-      for (int m = 0; m < 4; m++) {
+      for (int m = 0; m < 3; m++) {
         bc_vars[bc_ptr[i+1]] = m; // DOF m is set to 0 disp
         bc_vals[bc_ptr[i+1]] = 0.0;
         bc_ptr[i+1]++;
@@ -93,7 +95,7 @@ void createAssembler(MPI_Comm comm, int order, int nx, int ny, TacsScalar udisp,
       bc_ptr[i+1] = bc_ptr[i]; // start BC dof counter
       node = nnx - 1 + j * nnx;
       bcNodes[k] = node;
-      for (int m = 0; m < 4; m++) { // set x = udisp and y,z,rotx to 0
+      for (int m = 0; m < 3; m++) { // set x = udisp and y,z,rotx to 0
         bc_vars[bc_ptr[i+1]] = m; // DOF m is set to 0 disp
         TacsScalar disp;
         if (m == 0) {
@@ -107,7 +109,7 @@ void createAssembler(MPI_Comm comm, int order, int nx, int ny, TacsScalar udisp,
       }
       k++; i++;
     }
-    printf("udisp = %.8f", udisp);
+    // printf("udisp = %.8f", udisp);
 
     // Set the boundary conditions
     creator->setBoundaryConditions(numBcs, bcNodes, bc_ptr, bc_vars, bc_vals);

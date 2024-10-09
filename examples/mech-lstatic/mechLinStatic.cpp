@@ -85,8 +85,8 @@ void createAssembler(MPI_Comm comm, int order, int nx, int ny, TacsScalar udisp,
     int k = 0;
 
     int *bc_ptr = new int[numBcs + 1];
-    int *bc_vars = new int[4 * numBcs];
-    TacsScalar *bc_vals = new TacsScalar[4 * numBcs];
+    int *bc_vars = new int[3 * numBcs];
+    TacsScalar *bc_vals = new TacsScalar[3 * numBcs];
     bc_ptr[0] = 0;
     int i = 0; // BC counter
 
@@ -95,7 +95,7 @@ void createAssembler(MPI_Comm comm, int order, int nx, int ny, TacsScalar udisp,
       bc_ptr[i+1] = bc_ptr[i]; // start BC dof counter
       int node = j * nnx;
       bcNodes[k] = node;
-      for (int m = 0; m < 4; m++) {
+      for (int m = 0; m < 3; m++) {
         bc_vars[bc_ptr[i+1]] = m; // DOF m is set to 0 disp
         bc_vals[bc_ptr[i+1]] = 0.0;
         bc_ptr[i+1]++;
@@ -103,14 +103,21 @@ void createAssembler(MPI_Comm comm, int order, int nx, int ny, TacsScalar udisp,
       }
       k++; i++;
 
+      TacsScalar vdisp = 0.0;
+      TacsScalar wdisp = 0.0;
+
       bc_ptr[i+1] = bc_ptr[i]; // start BC dof counter
       node = nnx - 1 + j * nnx;
       bcNodes[k] = node;
-      for (int m = 0; m < 4; m++) { // set x = udisp and y,z,rotx to 0
+      for (int m = 0; m < 3; m++) { // set x = udisp and y,z,rotx to 0
         bc_vars[bc_ptr[i+1]] = m; // DOF m is set to 0 disp
         TacsScalar disp;
         if (m == 0) {
-            disp = udisp;
+          disp = udisp;
+        } else if (m == 1) {
+          disp = vdisp; // v disp to 0.01
+        } else if (m == 2) {
+          disp = wdisp;
         } else {
             disp = 0.0;
         }

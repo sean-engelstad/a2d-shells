@@ -8,83 +8,50 @@
 #include "TACSShellElementDefs.h"
 #include "TACSBuckling.h"
 #include "KSM.h"
+#include "createCylinder.h"
 
 // this example is based off of examples/crm/crm.cpp in TACS
 
-int main() {
-    // make the MPI communicator
-    MPI_Init(NULL, NULL);
-    MPI_Comm comm = MPI_COMM_WORLD;
+int main(int argc, char *argv[]) {
+    MPI_Init(&argc, &argv);
 
+    // Get the rank
+    MPI_Comm comm = MPI_COMM_WORLD;
     int rank;
     MPI_Comm_rank(comm, &rank);
 
-    // build the TACS mesh loader and scan the uCRM BDF file
-    if (rank == 0) {
-        printf("Scanning BDF file\n");
-    }
-    
-    TACSMeshLoader *mesh = new TACSMeshLoader(comm);
-    mesh->incref();
-    mesh->scanBDFFile("mech-cylinder.bdf");
+    // Parameters optionally set from the command line
+    int order = 2;
+    int nx = 100, ny = 100;
+    int mesh_type = 0;
 
-    // get number of components
-    int num_components = mesh->getNumComponents();
+    double t = 0.002; // m 
+    double L = 0.4; // m
+    double R = 0.2; // m
+    double udisp = -1e-5; // compressive udisp
 
-    // create the shell ref axis transform
-    // TacsScalar refAxis[3] = {1.0, 0.0, 0.0};
-    // TACSShellRefAxisTransform *transform = new TACSShellRefAxisTransform(refAxis);
-    
+    TacsScalar rho = 2700.0;
+    TacsScalar specific_heat = 921.096;
+    TacsScalar E = 70e3;
+    TacsScalar nu = 0.3;
+    TacsScalar ys = 270.0;
+    TacsScalar cte = 24.0e-6;
+    TacsScalar kappa = 230.0;
+    TACSMaterialProperties *props =
+        new TACSMaterialProperties(rho, specific_heat, E, nu, ys, cte, kappa);
+
+    // TacsScalar axis[] = {1.0, 0.0, 0.0};
+    // TACSShellTransform *transform = new TACSShellRefAxisTransform(axis);
     TACSShellTransform *transform = new TACSShellNaturalTransform();
 
-    // set material properties for aluminum (no thermal props input this time)
-    TacsScalar rho = 2718;
-    TacsScalar specific_heat = 0.0;
-    TacsScalar E = 72.0e9;
-    TacsScalar nu = 0.33;
-    TacsScalar ys = 1e11;
-    TacsScalar cte = 10e-6; // double check this value
-    TacsScalar kappa = 0.0;
-    TACSMaterialProperties *mat = 
-          new TACSMaterialProperties(rho, specific_heat, E, nu, ys, cte, kappa);
-    
-    // create the constitutive and element objects for each TACS component
-    if (rank == 0) {
-        printf("Creating constitutive and element objects for each TACS component\n");
-    }
-    
-    for (int icomp = 0; icomp < num_components; icomp++) {
-        const char *descriptor = mesh->getElementDescript(icomp);
-        TacsScalar thick = 0.010; // shell thickness
-        TACSIsoShellConstitutive *con = new TACSIsoShellConstitutive(mat, thick);
+    TACSShellConstitutive *con = new TACSIsoShellConstitutive(props, t);
 
-        // now create the shell element object
-        TACSElement *shell = TacsCreateShellByName(descriptor, transform, con);
-
-        // set the shell element into the mesh loader for that component
-        mesh->setElement(icomp, shell);
-    }
-
-    mat->decref();
-    transform->decref();
-
-    if (rank == 0) {
-        printf("\tdone\n");
-    }
-    
-
-    // now create the TACS assembler
-    if (rank == 0) {
-        printf("Creating TACS assembler\n");
-    }
-    
-    int vars_per_node = 6; // for shell elements
-    TACSAssembler *assembler = mesh->createTACS(vars_per_node);
-    assembler->incref();
-    mesh->decref();
-    if (rank == 0) {
-        printf("Done\n");
-    }
+    TACSAssembler *assembler = NULL;
+    TACSCreator *creator = NULL;
+    TACSElement *shell = NULL;
+    shell = new TACSQuad4Shell(transform, con);
+    shell->incref();
+    createAssembler(comm, order, nx, ny, udisp, shell, &assembler, &creator);
 
     // set temperature into all elements for thermal buckling
     // set to 0 for mechanical buckling
@@ -136,7 +103,8 @@ int main() {
 
     // make the buckling solver
     TacsScalar sigma = 10.0;
-    int max_lanczos_vecs = 100, num_eigvals = 50; // need high enough # eigvals to get it right
+    int max_lanczos_vecs = 100, num_eigvals = 5; // num_eigvals = 50;
+     // need high enough # eigvals to get it right
     double eig_tol = 1e-12;
 
     TACSLinearBuckling *buckling = new TACSLinearBuckling(assembler, sigma,

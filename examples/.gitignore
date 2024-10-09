@@ -1,0 +1,4 @@
+*.f5
+*.vtk
+_buckling
+_static

@@ -8,7 +8,7 @@
 #include "TACSShellElementDefs.h"
 #include "TACSBuckling.h"
 #include "KSM.h"
-#include "createCylinderDispControl.h"
+#include "createCylinderLoadControl.h"
 #include "TACSContinuation.h"
 
 // this example is based off of examples/crm/crm.cpp in TACS
@@ -63,7 +63,7 @@ int main(int argc, char *argv[]) {
     // needs to be nonlinear here otherwise solve will terminate immediately
     shell = new TACSQuad4NonlinearShell(transform, con); 
     shell->incref();
-    createAssembler(comm, order, nx, ny, udisp, L, R, shell, &assembler, &creator);
+    createAssembler(comm, order, nx, ny, L, R, shell, &assembler, &creator);
 
     // Solve the linear static analysis
     if (rank == 0) {
@@ -83,14 +83,18 @@ int main(int argc, char *argv[]) {
     u0->incref();
     f->incref();
 
-    // create zero loads
+    // compute end load vector
+    // warning this caused bugs last time
     TacsScalar *force_vals;
     int size = f->getArray(&force_vals);
     memset(force_vals, 0.0, size * sizeof(TacsScalar));
+    for (int j = 0; j < ny; j++) {
+        int node = nx + j * (nx + 1);
+        force_vals[6 * node] = -4.167e-5; // compressive axial load equiv to u = -1e-5
+    }
     assembler->applyBCs(f);
 
-    // nonlinear static
-    // --------------------------------------------
+    // create the matrices for buckling
     TACSSchurMat *kmat = assembler->createSchurMat();  // stiffness matrix
     kmat->incref();
 
@@ -107,6 +111,25 @@ int main(int argc, char *argv[]) {
 
     // set relative tolerances
     solver->setTolerances(1e-12, 1e-12);
+
+    // // do linear static analysis to test it
+    // TACSBVec *res = assembler->createVec();
+    // assembler->assembleJacobian(1.0, 0.0, 0.0, res, kmat);
+    // pc->factor();  // LU factorization of stiffness matrix
+    // pc->applyFactor(f, u0);
+
+    // res->scale(-1.0);
+    // assembler->setVariables(u0);
+
+    // // Output for visualization
+    // ElementType etype = TACS_BEAM_OR_SHELL_ELEMENT;
+    // int write_flag = (TACS_OUTPUT_NODES | TACS_OUTPUT_CONNECTIVITY |
+    //                     TACS_OUTPUT_DISPLACEMENTS | TACS_OUTPUT_STRAINS |
+    //                     TACS_OUTPUT_STRESSES | TACS_OUTPUT_EXTRAS);
+    // TACSToFH5 *f5 = new TACSToFH5(assembler, etype, write_flag);
+    // f5->incref();
+    // f5->writeToFile("cylinder_solution.f5");
+    // // end of linear static analysis
 
     // make a KSM print object for solving buckling
     KSMPrint *ksm_print = new KSMPrintStdout("NonlinearStatic", 0, 10);

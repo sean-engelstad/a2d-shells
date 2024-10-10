@@ -9,6 +9,7 @@
 #include "TACSBuckling.h"
 #include "KSM.h"
 #include "createCylinder.h"
+#include "TACSContinuation.h"
 
 // this example is based off of examples/crm/crm.cpp in TACS
 
@@ -85,16 +86,13 @@ int main(int argc, char *argv[]) {
     assembler->getDesignVars(x);
 
     // Create matrix and vectors
-    TACSBVec *u0 = NULL;
-    TACSBVec *f = NULL;
-    // OR instead of solving linear static:
-    //   set u0, f to NULL and it will solve it for you
-    // u0 = NULL; f = NULL;
+    TACSBVec *u0 = assembler->createVec();  // displacements and rotations
+    TACSBVec *f = assembler->createVec();    // loads
+    u0->incref();
+    f->incref();
 
     // create the matrices for buckling
     TACSSchurMat *kmat = assembler->createSchurMat();  // stiffness matrix
-    TACSSchurMat *gmat = assembler->createSchurMat();  // geometric stiffness matrix
-    TACSSchurMat *aux_mat = assembler->createSchurMat();  // auxillary matrix for shift and invert solver
 
     // Allocate the factorization
     int lev = 1e6;
@@ -103,59 +101,48 @@ int main(int argc, char *argv[]) {
     TACSSchurPc *pc = new TACSSchurPc(kmat, lev, fill, reorder_schur);
     pc->incref();
 
-    // optional other preconditioner settings?
-    assembler->assembleMatType(TACS_STIFFNESS_MATRIX, kmat);
-    assembler->assembleMatType(TACS_GEOMETRIC_STIFFNESS_MATRIX, gmat);
-
     int subspaceSize = 10, nrestarts = 15, isFlexible = 0;
-    GMRES *solver = new GMRES(aux_mat, pc, subspaceSize, nrestarts, isFlexible);
+    GMRES *solver = new GMRES(kmat, pc, subspaceSize, nrestarts, isFlexible);
     solver->incref();
 
     // set relative tolerances
     solver->setTolerances(1e-12, 1e-12);
 
-    // solve the linear static analysis for u0 and set f to NULL
-    // // f = NULL;
-    // u0 = assembler->createVec();  // displacements and rotations
-    // f = assembler->createVec();    // loads
-    // u0->incref();
-    // f->incref();
-    // // Create matrix and vectors
-    // TACSBVec *res = assembler->createVec();  // The residual
-    // res->incref();
-    // assembler->applyBCs(res);
-    // assembler->assembleJacobian(1.0, 0.0, 0.0, res, kmat);
-    // pc->factor();  // LU factorization of stiffness matrix
-    // pc->applyFactor(res, u0);
-    // u0->scale(-1.0);
-    // assembler->setVariables(u0);
-    // // Output for visualization
-    // ElementType etype = TACS_BEAM_OR_SHELL_ELEMENT;
-    // int write_flag = (TACS_OUTPUT_NODES | TACS_OUTPUT_CONNECTIVITY |
-    //                     TACS_OUTPUT_DISPLACEMENTS | TACS_OUTPUT_STRAINS |
-    //                     TACS_OUTPUT_STRESSES | TACS_OUTPUT_EXTRAS);
-    // TACSToFH5 *f5 = new TACSToFH5(assembler, etype, write_flag);
-    // f5->incref();
-    // f5->writeToFile("cylinder_solution.f5");
-    // // return 0;
-
-    // make the buckling solver
-    TacsScalar sigma = 10.0;
-    int max_lanczos_vecs = 300, num_eigvals = 50; // num_eigvals = 50;
-     // need high enough # eigvals to get it right
-    double eig_tol = 1e-12;
-
-    TACSLinearBuckling *buckling = new TACSLinearBuckling(assembler, sigma,
-                     gmat, kmat, aux_mat, solver, max_lanczos_vecs, num_eigvals, eig_tol);
-    buckling->incref();
-
     // make a KSM print object for solving buckling
-    KSMPrint *ksm_print = new KSMPrintStdout("BucklingAnalysis", 0, 10);
+    KSMPrint *ksm_print = new KSMPrintStdout("NonlinearStatic", 0, 10);
     ksm_print->incref();
 
-    // solve the buckling analysis
-    //    if u0, f are empty (are here) => then it should do a linear static analysis first
-    buckling->solve(f, u0, ksm_print);
+    // inputs to the TACSContinuation solver    
+    int max_continuation_iters = 10; // for prelim Newton solve to lambda_init
+    int max_correction_iters = 200; // for the nonlinear static regime
+    int max_correction_restarts = 5; // restart for nonlinear static regime
+    double corr_rtol = 1e-8;
+    double corr_dtol = 1e3; // if delta tolerance is huge it's failing to solve and breaks out prelim newton loop
+    double krylov_rtol = 1e-10; // krylov refers to the second solve where it reaches more severe loss of stability
+    double krylov_atol = 1e-10; 
+    double tangent_rtol = 1e-12; // for prelim newton solve section
+    double tangent_atol = 1e-12;
+    TACSContinuationCallback *callback = new TACSContinuationCallback(comm, "nlstatic.out");
+
+    // make the TACSContinuation solver for nonlinear static analysis
+    TACSContinuation *continuation = new TACSContinuation(
+        assembler, max_continuation_iters, max_correction_iters, max_correction_restarts,
+        corr_rtol, corr_dtol, krylov_rtol, krylov_atol, tangent_rtol, tangent_atol
+    );
+
+    // set load vector to zero
+    TacsScalar *force_vals;
+    int size = f->getArray(&force_vals);
+    memset(f, 0.0, size * sizeof(TacsScalar));
+
+    // try solving the nonlinear static analysis
+    // looks like it doesn't displacement control here (need to adjust that and the BCs in the TACSContinuation.cpp)
+    double lambda_init = 280.0; // is this the target final load factor?
+    double target_delta_lambda = 1.0;
+    continuation->solve_tangent(
+        kmat, pc, solver, f, lambda_init, target_delta_lambda,
+        ksm_print, callback
+    );
 
     // Create an TACSToFH5 object for writing output to files
     int write_flag = (TACS_OUTPUT_CONNECTIVITY | TACS_OUTPUT_NODES |
@@ -164,33 +151,6 @@ int main(int argc, char *argv[]) {
     TACSToFH5 *f5 =
         new TACSToFH5(assembler, TACS_BEAM_OR_SHELL_ELEMENT, write_flag);
     f5->incref();
-
-    // write each of the buckling modes to a file
-    
-    TACSBVec *phi = assembler->createVec();
-    phi->incref();
-    TacsScalar error;
-    for (int imode = 0; imode < num_eigvals; imode++) {
-        buckling->extractEigenvector(imode, phi, &error);
-        assembler->setVariables(phi);   
-        std::string filename = "_buckling/mech-buckle" + std::to_string(imode) + ".f5";
-        const char *cstr_filename = filename.c_str();
-        f5->writeToFile(cstr_filename);
-    }    
-
-    // decref all data
-    // f5->decref();
-    // x->decref();
-    // aux_mat->decref();
-    // kmat->decref();
-    // gmat->decref();
-    // pc->decref();
-    // solver->decref();
-    // u0->decref();
-    // f->decref();
-    // phi->decref();
-    // buckling->decref();
-    // ksm_print->decref();
 
     MPI_Finalize();
 

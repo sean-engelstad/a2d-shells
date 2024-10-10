@@ -10,7 +10,8 @@ include ../A2D_SHELLS.mk
 CXX_OBJS = TACSAssembler.o \
 	TACSCreator.o \
 	TACSAssembler_thread.o \
-	TACSBuckling.o
+	TACSBuckling.o \
+	TACSContinuation.o
 
 DIR=${TACS_DIR}/src
 

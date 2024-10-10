@@ -2,3 +2,5 @@
 *.vtk
 _buckling
 _static
+*.x
+*.out

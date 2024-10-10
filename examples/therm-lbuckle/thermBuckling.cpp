@@ -26,7 +26,7 @@ int main() {
     
     TACSMeshLoader *mesh = new TACSMeshLoader(comm);
     mesh->incref();
-    mesh->scanBDFFile("mech-cylinder.bdf");
+    mesh->scanBDFFile("therm-cylinder.bdf");
 
     // get number of components
     int num_components = mesh->getNumComponents();
@@ -87,13 +87,15 @@ int main() {
     }
 
     // set temperature into all elements for thermal buckling
-    // set to 0 for mechanical buckling
-    TacsScalar temperature = 0.0; 
+    TacsScalar temperature = 10.0; // default 1.0 // 1 deg K
     int numElements = assembler->getNumElements();
     TACSQuad4Shell *elem;
     for (int ielem = 0; ielem < numElements; ielem++) {
         elem = dynamic_cast<TACSQuad4Shell *>(assembler->getElement(ielem));
         elem->setTemperature(temperature);
+        #ifdef TACS_USE_COMPLEX
+            elem->setComplexStepGmatrix(true);
+        #endif
     }
 
     // Solve the linear static analysis
@@ -109,10 +111,12 @@ int main() {
     assembler->getDesignVars(x);
 
     // Create matrix and vectors
-    TACSBVec *u0 = assembler->createVec();  // displacements and rotations
-    TACSBVec *f = assembler->createVec();    // loads
-    u0->incref();
-    f->incref();
+    TACSBVec *u0 = NULL;  // displacements and rotations
+    TACSBVec *f = NULL;    // loads
+    // NOTE : if you want to do linearized buckling about arbitrary disps
+    // then you should do linear static yourself and then give the TACSLinearBuckling your u0
+    // u0->incref();
+    // f->incref();
 
     // create the matrices for buckling
     TACSSchurMat *kmat = assembler->createSchurMat();  // stiffness matrix
@@ -120,25 +124,24 @@ int main() {
     TACSSchurMat *aux_mat = assembler->createSchurMat();  // auxillary matrix for shift and invert solver
 
     // Allocate the factorization
-    int lev = 1e6;
+    int lev = 1e6; // default was 10000 (4 zeros), but TACS buckling default uses 1e6 (6 zeros)
     double fill = 10.0;
     int reorder_schur = 1;
     TACSSchurPc *pc = new TACSSchurPc(kmat, lev, fill, reorder_schur);
     pc->incref();
 
-    int subspaceSize = 10, nrestarts = 15, isFlexible = 0;
+    // int subspaceSize = 10, nrestarts = 15, isFlexible = 0; //defaults
+    int subspaceSize = 100, nrestarts = 15, isFlexible = 0;
     GMRES *solver = new GMRES(aux_mat, pc, subspaceSize, nrestarts, isFlexible);
     solver->incref();
 
     // set relative tolerances
     solver->setTolerances(1e-12, 1e-12);
 
-    // TODO : need to increase tolerances in the GMRES solver.. (see bucklingProb in python L2Convergence and setTolerances in GMRES)
-
     // make the buckling solver
-    TacsScalar sigma = 10.0;
-    int max_lanczos_vecs = 100, num_eigvals = 50; // need high enough # eigvals to get it right
-    double eig_tol = 1e-12;
+    TacsScalar sigma = 40.0;
+    int max_lanczos_vecs = 100, num_eigvals = 50;
+    double eig_tol = 1e-12; // 1e-12
 
     TACSLinearBuckling *buckling = new TACSLinearBuckling(assembler, sigma,
                      gmat, kmat, aux_mat, solver, max_lanczos_vecs, num_eigvals, eig_tol);
@@ -161,14 +164,14 @@ int main() {
     f5->incref();
 
     // write each of the buckling modes to a file
-    
     TACSBVec *phi = assembler->createVec();
     phi->incref();
     TacsScalar error;
     for (int imode = 0; imode < num_eigvals; imode++) {
         buckling->extractEigenvector(imode, phi, &error);
+        // Emily wants me to normalize the eigenvector here
         assembler->setVariables(phi);   
-        std::string filename = "_buckling/mech-buckle" + std::to_string(imode) + ".f5";
+        std::string filename = "_buckling/therm-buckle" + std::to_string(imode) + ".f5";
         const char *cstr_filename = filename.c_str();
         f5->writeToFile(cstr_filename);
     }    

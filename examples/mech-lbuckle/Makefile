@@ -1,13 +1,10 @@
 include ../../Makefile.in
 include ../../A2D_SHELLS.mk
 
-LOCAL_OBJS = thermBuckling.o mechBuckling.o
-EXECS = therm-buckling.x mech-buckling.x
+LOCAL_OBJS = mechBuckling.o
+EXECS = mech-buckling.x
 
 default: ${LOCAL_OBJS} ${EXECS}
-
-therm-buckling.x:
-	${CXX} -o therm-buckling.x thermBuckling.o ${TACS_LD_FLAGS}
 
 mech-buckling.x:
 	${CXX} -o mech-buckling.x mechBuckling.o ${TACS_LD_FLAGS}

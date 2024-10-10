@@ -11,11 +11,6 @@
 #include <chrono>
 #include <thread>
 
-void f()
-{
-    std::this_thread::sleep_for(std::chrono::seconds(1));
-}
-
 // this example is based off of examples/crm/crm.cpp in TACS
 
 int main() {
@@ -66,7 +61,8 @@ int main() {
         TACSIsoShellConstitutive *con = new TACSIsoShellConstitutive(mat, thick);
 
         // now create the shell element object
-        TACSElement *shell = TacsCreateShellByName(descriptor, transform, con);
+        // TACSElement *shell = TacsCreateShellByName(descriptor, transform, con);
+        TACSElement *shell = new TACSQuad4ShellOrig(transform, con);
 
         // set the shell element into the mesh loader for that component
         mesh->setElement(icomp, shell);
@@ -140,11 +136,11 @@ int main() {
 
     double alpha = 1.0, beta = 0.0, gamma = 0.0;
     assembler->assembleJacobian(alpha, beta, gamma, NULL, matrix);
-
+ 
     double t2 = MPI_Wtime();
-    double dt = t2 - t1;
     //auto t2 = std::chrono::high_resolution_clock::now();
     //TacsScalar dt = std::chrono::duration_cast<std::chrono::milliseconds>(t2-t1).count() / 1000.0;
+    double dt = t2 - t1;
     printf("Done with assemble Jacobian in %.8e sec\n", dt);
 
     // OPTIONAL test assembling the residuals

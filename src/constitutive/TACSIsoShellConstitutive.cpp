@@ -188,6 +188,72 @@ void TACSIsoShellConstitutive::evalStress(int elemIndex, const double pt[],
   }
 }
 
+int TACSIsoShellConstitutive::symind(int irow, int icol, int N) {
+  // get the symind of a vector storage of symmat size N x N
+  return icol + (N+1)*N / 2 - (N+1-irow)*(N+1-irow-1)/2;
+};
+
+// Evaluate the stress
+void TACSIsoShellConstitutive::getABDmatrix(int elemIndex, const double pt[], const TacsScalar X[], TacsScalar ABD[]) {
+  // TacsScalar ABD[45]; // sym part of 9x9 ABD matrix
+  if (properties) {
+    
+    // compute submatrices in the ABD
+    TacsScalar A[6], B[6], D[6], As[3], drill;
+
+    // Compute the tangent stiffness matrix
+    properties->evalTangentStiffness2D(A);
+
+    // The bending-stretch coupling matrix is zero in this case
+    B[0] = B[1] = B[2] = B[3] = B[4] = B[5] = 0.0;
+
+    // Scale the in-plane matrix and bending stiffness
+    // matrix by the appropriate quantities
+    TacsScalar I = t * t * t / 12.0;
+    for (int i = 0; i < 6; i++) {
+      D[i] = I * A[i];
+      A[i] *= t;
+      B[i] += -tOffset * t * A[i];
+      D[i] += tOffset * tOffset * t * t * A[i];
+    }
+
+    // Set the through-thickness shear stiffness
+    As[0] = As[2] = (5.0 / 6.0) * A[5];
+    As[1] = 0.0;
+
+    drill = 0.5 * DRILLING_REGULARIZATION * (As[0] + As[2]);
+
+    // now finally compute the matrix in its blocks (only store symmetric parts, 45 entries)
+    // values go into A2D SymMat data storage of TacsScalar[45] array
+    // ABD = [[A, B, 0, 0],
+    //        [B, D, 0, 0],
+    //        [0, 0, As, 0],
+    //        [0, 0, 0, drill]]
+
+    for (int irow = 0; irow < 9; irow++) {
+      for (int icol = irow; icol < 9; icol++) {
+        if (irow < 3 && icol < 3) {
+          // copy the A matrix
+          ABD[symind(irow,icol,9)] = A[symind(irow,icol,3)];
+        } else if (irow < 3 && 3 < icol && icol < 6) {
+          // copy the B matrix
+          ABD[symind(irow,icol,9)] = B[symind(irow,icol-3,3)];
+        } else if (3 < irow && irow < 6 && 3 < icol && icol < 6) {
+          // copy the D matrix
+          ABD[symind(irow,icol,9)] = D[symind(irow-3,icol-3,3)];
+        } else if ((irow == 6 && icol == 6) or (irow == 7 && icol == 7)) {
+          // copy the As transverse shear matrix
+          ABD[symind(irow,icol,9)] = As[irow-6];
+        } else if (irow == 8 && icol == 8) {
+          ABD[symind(irow,icol,9)] = drill;
+        }
+      }
+    }
+  } else {
+    memset(ABD, 45 * sizeof(TacsScalar), 0.0);
+  }
+}
+
 // Evaluate the tangent stiffness
 void TACSIsoShellConstitutive::evalTangentStiffness(int elemIndex,
                                                     const double pt[],

@@ -1,16 +1,10 @@
 include ../../Makefile.in
 include ../../A2D_SHELLS.mk
 
-LOCAL_OBJS = RunCRM.o RunCRM_orig.o
-LOCAL_EXECS = runcrm.x runcrm_orig.x
+default: mya2d.o mya2d.x
 
-default: ${LOCAL_OBJS} ${LOCAL_EXECS}
-
-runcrm.x:
-	${CXX} -o runcrm.x RunCRM.o ${TACS_LD_FLAGS}
-
-runcrm_orig.x:
-	${CXX} -o runcrm_orig.x RunCRM_orig.o ${TACS_LD_FLAGS}
+runcrm:
+	${CXX} -o mya2d.x mya2d.o ${TACS_LD_FLAGS}
 
 debug: TACS_CC_FLAGS=${TACS_DEBUG_CC_FLAGS}
 debug: default

@@ -69,9 +69,15 @@ class TACSIsoShellConstitutive : public TACSShellConstitutive {
   TacsScalar evalSpecificHeat(int elemIndex, const double pt[],
                               const TacsScalar X[]);
 
+  int symind(int irow, int icol, int N);
+
   // Evaluate the stresss
   void evalStress(int elemIndex, const double pt[], const TacsScalar X[],
                   const TacsScalar strain[], TacsScalar stress[]);
+                  
+  // compute the ABD matrix
+  void getABDmatrix(int elemIndex, const double pt[],
+               const TacsScalar X[], TacsScalar ABD[]);
 
   // Evaluate the tangent stiffness
   void evalTangentStiffness(int elemIndex, const double pt[],

@@ -6,12 +6,19 @@
 #include "TACSShellElementModel.h"
 #include "TACSShellElementQuadBasis.h"
 
+// for verification
+#include "TACSShellElement_orig.h"
+
 /*
   Linear shell elements with appropriate quadrature schemes
 */
 typedef TACSShellElement<TACSQuadLinearQuadrature, TACSShellQuadBasis<2>,
                          TACSLinearizedRotation, TACSShellLinearModel>
     TACSQuad4Shell;
+
+typedef TACSShellElementOrig<TACSQuadLinearQuadrature, TACSShellQuadBasis<2>,
+                         TACSLinearizedRotation, TACSShellLinearModel>
+    TACSQuad4ShellOrig;
 
 typedef TACSShellElement<TACSQuadQuadraticQuadrature, TACSShellQuadBasis<3>,
                          TACSLinearizedRotation, TACSShellLinearModel>

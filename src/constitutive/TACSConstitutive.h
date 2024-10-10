@@ -94,6 +94,9 @@ class TACSConstitutive : public TACSObject {
     return 0;
   }
 
+  virtual void getABDmatrix(int elemIndex, const double pt[],
+               const TacsScalar X[], TacsScalar ABD[]) {};
+
   /**
     Get the lower and upper bounds for the design variable values
 

@@ -11,6 +11,10 @@ RM = rm -f
 PYTHON = python
 PIP = pip
 
+# declare A2D location for headers
+A2D_DIR = ${HOME}/git/a2d
+A2D_INCLUDE = -I${A2D_DIR}/include
+
 # Set up for parallel make
 MAKE = make -j 8
 

@@ -210,11 +210,11 @@ class TACSAssembler : public TACSObject {
 
   // Residual and Jacobian assembly
   // ------------------------------
-  void assembleRes(TACSBVec *residual, const TacsScalar lambda = 1.0);
+  void assembleRes(TACSBVec *residual, const TacsScalar lambdaAux = 1.0, const TacsScalar lambdaBC = 1.0);
   void assembleJacobian(TacsScalar alpha, TacsScalar beta, TacsScalar gamma,
                         TACSBVec *residual, TACSMat *A,
                         MatrixOrientation matOr = TACS_MAT_NORMAL,
-                        const TacsScalar lambda = 1.0);
+                        const TacsScalar lambda = 1.0, const TacsScalar lambdaBC = 1.0);
   void assembleMatType(ElementMatrixType matType, TACSMat *A,
                        MatrixOrientation matOr = TACS_MAT_NORMAL,
                        const TacsScalar lambda = 1.0);

@@ -115,7 +115,7 @@ int main(int argc, char *argv[]) {
     // inputs to the TACSContinuation solver    
     int max_continuation_iters = 300; // for prelim Newton solve to lambda_init
     int max_correction_iters = 100; // for the arc length method static regime
-    int max_correction_restarts = 10; // restart for nonlinear static regime
+    int max_correction_restarts = 2; // restart for nonlinear static regime
     double corr_rtol = 1e-3; // this needs improvement and an atol (since already fairly low)
     double corr_dtol = 1e3; // if divergence tolerance is huge it's failing to solve and breaks out prelim newton loop
     double krylov_rtol = 1e-6; // krylov refers to the second solve where it reaches more severe loss of stability

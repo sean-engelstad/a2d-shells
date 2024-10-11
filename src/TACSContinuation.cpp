@@ -319,7 +319,8 @@ void TACSContinuation::solve_tangent(TACSMat *mat, TACSPc *pc, TACSKsm *ksm,
 
     // Compute and factor the stiffness matrix
     TacsScalar alpha = 1.0, beta = 0.0, gamma = 0.0;
-    assembler->assembleJacobian(alpha, beta, gamma, res, mat);
+    //printf("prelim Newton loop init assembleJacobian, lambda = %.4e\n", lambda);
+    assembler->assembleJacobian(alpha, beta, gamma, res, mat, TACS_MAT_NORMAL, 1.0, lambda);
     pc->factor();
 
     // Compute the tangent vector
@@ -337,7 +338,8 @@ void TACSContinuation::solve_tangent(TACSMat *mat, TACSPc *pc, TACSKsm *ksm,
       assembler->setVariables(vars);
 
       // Assemble the residuals at the current point
-      assembler->assembleRes(res);
+      // printf("prelim newton loop, assembleRes iter %d, lambda = %.4e\n", k, lambda);
+      assembler->assembleRes(res, 1.0, lambda);
       res->axpy(-lambda, load);
 
       TacsScalar res_norm = res->norm();
@@ -375,7 +377,8 @@ void TACSContinuation::solve_tangent(TACSMat *mat, TACSPc *pc, TACSKsm *ksm,
 
     // Assemble the stiffness matrix at the current iteration
     TacsScalar alpha = 1.0, beta = 0.0, gamma = 0.0;
-    assembler->assembleJacobian(alpha, beta, gamma, res, mat);
+    //printf("continuation loop %d assembleJacobian, lambda = %.4e\n", iteration_count, lambda);
+    assembler->assembleJacobian(alpha, beta, gamma, res, mat, TACS_MAT_NORMAL, 1.0, lambda);
 
     // Compute the residual as r(u, lambda) = R(u) - lambda*load
     res->axpy(-lambda, load);
@@ -501,7 +504,8 @@ void TACSContinuation::solve_tangent(TACSMat *mat, TACSPc *pc, TACSKsm *ksm,
       for (int j = 0; j < max_correction_iters; j++) {
         // Compute the residual at the current value of (u, lambda)
         assembler->setVariables(vars);
-        assembler->assembleRes(res);
+        //printf("correction loop, assembleRes iter %d, lambda = %.4e\n", j, lambda);
+        assembler->assembleRes(res, 1.0, lambda);
         res->axpy(-lambda, load);
 
         TacsScalar res_norm = res->norm();

@@ -3995,9 +3995,10 @@ void TACSAssembler::evalEnergies(TacsScalar *Te, TacsScalar *Pe) {
   after the assembly of the residual is complete.
 
   @param residual The residual vector
-  @param lambda Scaling factor for the aux element contributions, by default 1
+  @param lambdaAux Scaling factor for the aux element contributions, by default 1
+  @param lambdaBC Scaling factor for displacement BCs, by default 1
 */
-void TACSAssembler::assembleRes(TACSBVec *residual, const TacsScalar lambda) {
+void TACSAssembler::assembleRes(TACSBVec *residual, const TacsScalar lambdaAux, const TacsScalar lambdaBC) {
   // Zero the residual
   residual->zeroEntries();
 
@@ -4005,7 +4006,7 @@ void TACSAssembler::assembleRes(TACSBVec *residual, const TacsScalar lambda) {
     // Set the number of completed elements to zero
     numCompletedElements = 0;
     tacsPInfo->assembler = this;
-    tacsPInfo->lambda = lambda;
+    tacsPInfo->lambda = lambdaAux;
 
     // Create the joinable attribute
     pthread_attr_t attr;
@@ -4059,7 +4060,8 @@ void TACSAssembler::assembleRes(TACSBVec *residual, const TacsScalar lambda) {
   residual->endSetValues(TACS_ADD_VALUES);
 
   // Apply the boundary conditions for the residual
-  residual->applyBCs(bcMap, varsVec);
+  //printf("TACSAssembler::assembleRes, lambda = %.4e\n", lambdaBC);
+  residual->applyBCs(bcMap, varsVec, lambdaBC);
 }
 
 /**
@@ -4079,12 +4081,13 @@ void TACSAssembler::assembleRes(TACSBVec *residual, const TacsScalar lambda) {
   @param residual The residual of the governing equations
   @param A The Jacobian matrix
   @param matOr the matrix orientation NORMAL or TRANSPOSE
-  @param lambda Scaling factor for the aux element contributions, by default 1
+  @param lambdaAux Scaling factor for the aux element contributions, by default 1
+  @param lambdaBC Scaling factor for the disp BCs, by default 1
 */
 void TACSAssembler::assembleJacobian(TacsScalar alpha, TacsScalar beta,
                                      TacsScalar gamma, TACSBVec *residual,
                                      TACSMat *A, MatrixOrientation matOr,
-                                     const TacsScalar lambda) {
+                                     const TacsScalar lambdaAux, const TacsScalar lambdaBC) {
   // Zero the residual and the matrix
   if (residual) {
     residual->zeroEntries();
@@ -4101,7 +4104,7 @@ void TACSAssembler::assembleJacobian(TacsScalar alpha, TacsScalar beta,
     tacsPInfo->alpha = alpha;
     tacsPInfo->beta = beta;
     tacsPInfo->gamma = gamma;
-    tacsPInfo->lambda = lambda;
+    tacsPInfo->lambda = lambdaAux;
     tacsPInfo->matOr = matOr;
 
     // Create the joinable attribute
@@ -4166,7 +4169,8 @@ void TACSAssembler::assembleJacobian(TacsScalar alpha, TacsScalar beta,
 
   // Apply the boundary conditions
   if (residual) {
-    residual->applyBCs(bcMap, varsVec);
+    //printf("TACSAssembler::assembleJacobian, lambda = %.4e\n", lambdaBC);
+    residual->applyBCs(bcMap, varsVec, lambdaBC);
   }
 
   // Apply the appropriate boundary conditions

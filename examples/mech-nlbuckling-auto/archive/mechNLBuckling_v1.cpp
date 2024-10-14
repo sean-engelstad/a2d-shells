@@ -33,7 +33,7 @@ int main(int argc, char *argv[]) {
 
     // need a better way to predict the disp based on closed-form solutions of linear buckling
     // double udisp = -1e-5; // compressive udisp (for r/t = 100)
-    double udisp = -0.3e-4; // ( for r/t = 25 )to be most accurate want udisp about 1/200 to 1/300 the linear buckling disp
+    double udisp = -0.5e-4; // ( for r/t = 25 )to be most accurate want udisp about 1/200 to 1/300 the linear buckling disp
 
     // select nelems and it will select to retain isotropic elements (good element AR)
     // want dy = 2 * pi * R / ny the hoop elem spacing to be equal dx = L / nx the axial elem spacing
@@ -154,8 +154,7 @@ int main(int argc, char *argv[]) {
     // exit(0);
 
     // choose imperfection sizes for the cylinder based on the cylinder thickness
-    // TacsScalar imperfection_sizes[3] = {0.5 * t, 0.1 * t, 0.05 * t}; // t is cylinder thickness here
-    TacsScalar imperfection_sizes[3] = {0.5 * t, 0.0, 0.0};
+    TacsScalar imperfection_sizes[3] = {0.5 * t, 0.1 * t, 0.05 * t}; // t is cylinder thickness here
 
     // apply the first few eigenmodes as geometric imperfections to the cylinder
     TACSBVec *phi = assembler->createVec();

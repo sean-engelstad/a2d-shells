@@ -18,7 +18,6 @@
 // and the KDF (ratio of NL load factor / Linear load factor for buckling) or knockdown factor is computed and saved.
 
 
-
 int main(int argc, char *argv[]) {
     MPI_Init(&argc, &argv);
 
@@ -31,7 +30,7 @@ int main(int argc, char *argv[]) {
     for (int irun = 0; irun < 7; irun++) {
         double rt = rtVals[irun];
         double Lr = 2.0;
-        int nelems = 10000; // 5000, 
+        int nelems = 20000; // 5000, 10000
         getNonlinearBucklingKDF(comm, irun+1, rt, 2.0, nelems);
     }   
 

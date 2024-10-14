@@ -485,6 +485,11 @@ void getNonlinearBucklingKDF(MPI_Comm comm, int run, double rt, double Lr = 2.0,
                 break; // break out of the arc length loop and we are done with nonlinear buckling!
             }
 
+            if (eigval < 2.0) {
+                // now set more rapid buckling checking near the final eigenvalue
+                num_arclength_per_lbuckle = 3;
+            }
+
             // would also really like to write out the linear eigenvalues and |u|, etc. to a custom buckling .out file
             // so we can monitor the progress as it moves towards nonlinear buckling
 

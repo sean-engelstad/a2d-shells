@@ -27,13 +27,14 @@ int main(int argc, char *argv[]) {
     int order = 2;
 
     double t = 0.002; // m 
-    double L = 0.4; // m
-    double rt = 25; // 100
+    double Lr = 2.0; // default 2.0
+    double rt = 500; // 100, 50, 25
     double R = t * rt; // m
+    double L = R * Lr;
 
     // need a better way to predict the disp based on closed-form solutions of linear buckling
     // double udisp = -1e-5; // compressive udisp (for r/t = 100)
-    double udisp = -0.3e-4; // ( for r/t = 25 )to be most accurate want udisp about 1/200 to 1/300 the linear buckling disp
+    double udisp = -1e-5; // ( for r/t = 25 )to be most accurate want udisp about 1/200 to 1/300 the linear buckling disp
 
     // select nelems and it will select to retain isotropic elements (good element AR)
     // want dy = 2 * pi * R / ny the hoop elem spacing to be equal dx = L / nx the axial elem spacing
@@ -212,9 +213,19 @@ int main(int argc, char *argv[]) {
         fp = fopen("nl_buckling.out", "w");
 
         if (fp) {
-        fprintf(fp, "Variables = iter, lambda, |u|/lambda, dlambda_ds, loc_eigval, LIN_buckle, pred_NL_buckle\n");
-        fprintf(fp, "Zone T=\"Continuation points\"\n");
-        fflush(fp);
+            fprintf(fp, "$ Nonlinear mechanical buckling of cylinder : t = %15.6e, r/t = %15.6e, L/r = %15.6e\n", t, rt, Lr);
+            fprintf(fp, "iter, lambda,         |u|/lambda,     dlambda_ds,     loc_eigval,     error,          LIN_buckle,     pred_NL_buckle\n");
+            fflush(fp);
+        }
+    }
+
+    // write another file for plotting load-displacement curve
+    FILE *fp2;
+    if (rank == 0) {
+        fp2 = fopen("load-disp.csv", "w");
+        if (fp2) {
+            fprintf(fp2, "iter,|u|,lambda\n");
+            fflush(fp2);
         }
     }
 
@@ -237,7 +248,8 @@ int main(int argc, char *argv[]) {
     double tangent_rtol = 1e-6; // for prelim newton solve section
     double tangent_atol = 1e-10;
     int num_arclength_per_lbuckle = 10; // 5 is default // num arc length steps for each linear buckling check
-    double min_NL_eigval = 1.0; // for some reason SEP solver can't drive eigenvalue below zero with shift and invert (needs work)
+    double min_NL_eigval = 0.5; // default is 1.0 or 0.5
+    // for some reason SEP solver can't drive eigenvalue below zero with shift and invert (needs work)
     bool hit_buckling = false;
     TacsScalar nonlinear_eigval;
 
@@ -321,7 +333,7 @@ int main(int argc, char *argv[]) {
     // arc-length continuation step for each new (u,lambda) point
     // ----------------------------------------------------------
     int num_failures = 0;
-    TacsScalar eigval;
+    TacsScalar eigval, loc_error;
     TacsScalar sigma_init = 1.0;
 
     TacsScalar dlambda_ds = 0.0; 
@@ -483,7 +495,7 @@ int main(int argc, char *argv[]) {
             // option 2 - finds K_t(u) + lambda * |u| * d/ds K_t(u + s * u / |u|)
             //     then easier to determine predicted final lambda for final buckling..
             // buckling->solve(NULL, vars, ksm_print_buckling, NULL); // this one gives G(u,u)
-            eigval = buckling->extractEigenvalue(0, &error);
+            eigval = buckling->extractEigenvalue(0, &loc_error);
             if (TacsRealPart(eigval) < TacsRealPart(min_NL_eigval)) {
                 nonlinear_eigval = lambda;
                 break; // break out of the arc length loop and we are done with nonlinear buckling!
@@ -497,12 +509,20 @@ int main(int argc, char *argv[]) {
                 // pred_lambda_NL = lambda * eigval
                 TacsScalar pred_lambda_NL = lambda + eigval * lambda * delta_vars->norm() / vars->norm();
                 TacsScalar unorm_over_lambda = vars->norm() / lambda; // shows geometric NL stiffening
-                fprintf(fp, "%2d %15.6e %15.6e %15.6e %15.6e %15.6e %15.6e \n", iarclength + 1, 
+                fprintf(fp, "%2d %15.6e %15.6e %15.6e %15.6e %15.6e %15.6e %15.6e \n", iarclength + 1, 
                     TacsRealPart(lambda), TacsRealPart(unorm_over_lambda), TacsRealPart(dlambda_ds),
-                    TacsRealPart(eigval), TacsRealPart(linear_eigval), TacsRealPart(pred_lambda_NL));
+                    TacsRealPart(eigval), TacsRealPart(loc_error), TacsRealPart(linear_eigval), 
+                    TacsRealPart(pred_lambda_NL));
                 fflush(fp);
             }
 
+        }
+
+        // update load-displacement curve
+        if (fp2) {
+            // iter, |u|, lambda
+            fprintf(fp2, "%2d,%15.6e,%15.6e\n", iarclength+1, TacsRealPart(vars->norm()), TacsRealPart(lambda));
+            fflush(fp2);
         }
         
 

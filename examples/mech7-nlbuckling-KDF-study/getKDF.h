@@ -467,7 +467,7 @@ void getNonlinearBucklingKDF(MPI_Comm comm, int run, double rt, double Lr = 2.0,
             if (iarclength == num_arclength_per_lbuckle) {
                 sigma = 1.0; // first time
             } else {
-                if (eigval < 2.0) {
+                if (eigval < 2.0 * min_NL_eigval) {
                     sigma = 0.01;
                 }
             }

@@ -61,6 +61,8 @@ class TACSLinearBuckling : public TACSObject {
   // ----------------------------
   void solve(TACSVec *rhs = NULL, TACSVec *u0 = NULL,
              KSMPrint *ksm_print = NULL);
+  void solve_local(TACSVec *rhs = NULL, TACSVec *u0 = NULL,
+             KSMPrint *ksm_print = NULL, TACSVec *du = NULL);
   void evalEigenDVSens(int n, TACSBVec *dfdx);
   void evalEigenXptSens(int n, TACSBVec *dfdX);
   void evalEigenSVSens(int n, TACSBVec *dfdu);
@@ -98,6 +100,7 @@ class TACSLinearBuckling : public TACSObject {
 
   // Vectors used in the analysis
   TACSBVec *path;  // The solution path
+  TACSBVec *vars, *delta_vars;
   TACSBVec *res, *update, *eigvec;
 
   // The multigrid object -- only defined if a multigrid

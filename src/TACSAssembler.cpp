@@ -4177,6 +4177,49 @@ void TACSAssembler::assembleJacobian(TacsScalar alpha, TacsScalar beta,
   A->applyBCs(bcMap);
 }
 
+// clean this routine up.. need to get G(u,du)
+void TACSAssembler::assembleNonlinearGmat(ElementMatrixType matType, TACSMat *A,
+                       MatrixOrientation matOr, const TacsScalar lambda, TACSBVec *du) {
+  // Zero the matrix
+  A->zeroEntries();
+
+  // removed pthreading here..
+  
+  // Retrieve pointers to temporary storage
+  TacsScalar *vars, *elemXpts, *elemMat, *elemWeights;
+  getDataPointers(elementData, &vars, NULL, NULL, NULL, &elemXpts, NULL,
+                  &elemWeights, &elemMat);
+  // set initial size of elemPath (others are pointing to old data)
+  TacsScalar *elemPath = new TacsScalar[maxElementSize];
+
+  // To avoid allocating memory inside the element loop, make the aux element
+  // contribution mat big enough for the largest element
+  int maxNVar = this->maxElementSize;
+
+  for (int i = 0; i < numElements; i++) {
+    // Retrieve the element variables and node locations
+    int ptr = elementNodeIndex[i];
+    int len = elementNodeIndex[i + 1] - ptr;
+    int nvars = elements[i]->getNumVariables();
+    const int *nodes = &elementTacsNodes[ptr];
+    xptVec->getValues(len, nodes, elemXpts);
+    varsVec->getValues(len, nodes, vars);
+    // maybe this is what fails?
+    du->getValues(len, nodes, elemPath);
+
+    // Get the element matrix
+    elements[i]->getMatType(matType, i, time, elemXpts, vars, elemMat, elemPath);
+
+    // Add the values into the element
+    addMatValues(A, i, elemMat, elementIData, elemWeights, matOr);
+  }
+
+  A->beginAssembly();
+  A->endAssembly();
+
+  A->applyBCs(bcMap);
+}
+
 /**
   Assemble a matrix of a specified type. Note that all matrices
   created from the TACSAssembler object have the same non-zero pattern
@@ -4239,7 +4282,7 @@ void TACSAssembler::assembleMatType(ElementMatrixType matType, TACSMat *A,
       varsVec->getValues(len, nodes, vars);
 
       // Get the element matrix
-      elements[i]->getMatType(matType, i, time, elemXpts, vars, elemMat);
+      elements[i]->getMatType(matType, i, time, elemXpts, vars, elemMat, NULL);
 
       // Add the values into the element
       addMatValues(A, i, elemMat, elementIData, elemWeights, matOr);

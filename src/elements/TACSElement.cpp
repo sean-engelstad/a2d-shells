@@ -333,7 +333,7 @@ void TACSElement::addAdjResXptProduct(
 
 void TACSElement::getMatType(ElementMatrixType matType, int elemIndex,
                              double time, const TacsScalar Xpts[],
-                             const TacsScalar vars[], TacsScalar mat[]) {
+                             const TacsScalar vars[], TacsScalar mat[], const TacsScalar _path[]) {
   int size = getNumNodes() * getVarsPerNode();
   memset(mat, 0, size * size * sizeof(TacsScalar));
   TacsScalar alpha, beta, gamma;

@@ -145,7 +145,7 @@ class TACSShellElement : public TACSElement {
 
   void getMatType(ElementMatrixType matType, int elemIndex, double time,
                   const TacsScalar Xpts[], const TacsScalar vars[],
-                  TacsScalar mat[]);
+                  TacsScalar mat[], const TacsScalar path[] = NULL);
 
   void addAdjResProduct(int elemIndex, double time, TacsScalar scale,
                         const TacsScalar psi[], const TacsScalar Xpts[],
@@ -674,7 +674,8 @@ void TACSShellElement<quadrature, basis, director, model>::addJacobian(
 template <class quadrature, class basis, class director, class model>
 void TACSShellElement<quadrature, basis, director, model>::getMatType(
     ElementMatrixType matType, int elemIndex, double time,
-    const TacsScalar Xpts[], const TacsScalar vars[], TacsScalar mat[]) {
+    const TacsScalar Xpts[], const TacsScalar vars[], TacsScalar mat[],
+    const TacsScalar _path[]) {
   memset(mat, 0,
          vars_per_node * num_nodes * vars_per_node * num_nodes *
              sizeof(TacsScalar));
@@ -706,10 +707,22 @@ void TACSShellElement<quadrature, basis, director, model>::getMatType(
     // Approximate geometric stiffness using directional derivative of
     // tangential stiffness projected along path of current state vars
 
+    // unnormalized path
+    TacsScalar *delta_vars = new TacsScalar[vars_per_node * num_nodes];
+    if (_path) {
+      for (int i = 0; i < vars_per_node * num_nodes; i++) {
+        delta_vars[i] = _path[i];
+      }
+    } else {
+      for (int i = 0; i < vars_per_node * num_nodes; i++) {
+        delta_vars[i] = vars[i]; // if path not specified use current soln to linearize
+      }
+    }
+
     // compute norm for normalizing path vec
     norm = 0.0;
     for (int i = 0; i < vars_per_node * num_nodes; i++) {
-      norm += vars[i] * vars[i];
+      norm += delta_vars[i] * delta_vars[i];
     }
 
     // include thermal path in norm
@@ -727,7 +740,7 @@ void TACSShellElement<quadrature, basis, director, model>::getMatType(
     // fwd step
     path = new TacsScalar[vars_per_node * num_nodes];
     for (int i = 0; i < vars_per_node * num_nodes; i++) {
-      path[i] = dh * vars[i] / norm;
+      path[i] = dh * delta_vars[i] / norm;
     }
 
     // temperature perturbation as well (for thermal buckling)

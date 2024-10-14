@@ -127,10 +127,12 @@ TACSLinearBuckling::TACSLinearBuckling(TACSAssembler *_assembler,
   update = assembler->createVec();
   eigvec = assembler->createVec();
   path = assembler->createVec();
+  vars = assembler->createVec();
   res->incref();
   update->incref();
   eigvec->incref();
   path->incref();
+  vars->incref();
 }
 
 /*
@@ -155,6 +157,7 @@ TACSLinearBuckling::~TACSLinearBuckling() {
   res->decref();
   update->decref();
   eigvec->decref();
+  vars->decref();
 }
 
 /*
@@ -275,6 +278,76 @@ void TACSLinearBuckling::solve(TACSVec *rhs, TACSVec *u0, KSMPrint *ksm_print) {
 
   // Solve the symmetric eigenvalue problem
   sep->solve(ksm_print);
+}
+
+/*
+  Solves the linearized buckling problem about u0 with perturbation du for the load path.
+  Meant for checking eigenvalues in the nonlinear regime for an arc-length method.
+*/
+void TACSLinearBuckling::solve_local(TACSVec *rhs, TACSVec *u0, KSMPrint *ksm_print, TACSVec *du) {
+  // Zero the variables
+  assembler->zeroVariables();
+  if (du) {
+    du->incref();
+  }
+
+  if (u0) {
+    if (du) {
+      path->copyValues(du);
+    } else {
+      path->copyValues(u0);
+    }
+  } else {
+    pc->factor();
+    assembler->assembleRes(res);
+
+    // If need to add rhs
+    if (rhs) {
+      // copy force values and zero bcs indices
+      update->copyValues(rhs);
+      assembler->applyBCs(update);
+      res->axpy(-1.0, update);
+    }
+
+    // Solve for the load path and set the variables
+    solver->solve(res, path);
+    path->scale(-1.0);
+  }
+
+  // set BCs associated with displacements (displacement control)
+  if (du) {
+    if (u0) {
+      vars->copyValues(u0);
+      assembler->setBCs(vars);
+      assembler->setVariables(vars);
+    } else {
+      exit(0);
+    }
+  } else {
+    assembler->setBCs(path);
+    assembler->setVariables(path);
+  }
+
+  // Compute the stiffness matrix and copy the values to the
+  // auxiliary matrix used to solve for the load path.
+  assembler->assembleMatType(TACS_STIFFNESS_MATRIX, kmat);
+  aux_mat->copyValues(kmat);
+
+  // Assemble the stiffness and geometric stiffness matrix
+  // assembler->assembleMatType(TACS_GEOMETRIC_STIFFNESS_MATRIX, gmat);
+  assembler->assembleNonlinearGmat(TACS_GEOMETRIC_STIFFNESS_MATRIX, gmat, TACS_MAT_NORMAL, 1.0, path);
+  // assembler->assembleMatType(TACS_GEOMETRIC_STIFFNESS_MATRIX, gmat, TACS_MAT_NORMAL, 1.0, path);
+
+  // Form the shifted operator and factor it
+  aux_mat->axpy(sigma, gmat);
+  aux_mat->applyBCs(assembler->getBcMap());
+
+  // Factor the preconditioner
+  pc->factor();
+
+  // Solve the symmetric eigenvalue problem
+  sep->solve(ksm_print);
+  // du->decref();
 }
 
 /*!

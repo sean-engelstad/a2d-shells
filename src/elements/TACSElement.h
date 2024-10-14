@@ -522,10 +522,11 @@ class TACSElement : public TACSObject {
     @param Xpts The element node locations
     @param vars The values of element degrees of freedom
     @param mat The element matrix output
+    @param path optional local disp path du on the u(s) path for nonlinear regime
   */
   virtual void getMatType(ElementMatrixType matType, int elemIndex, double time,
                           const TacsScalar Xpts[], const TacsScalar vars[],
-                          TacsScalar mat[]);
+                          TacsScalar mat[], const TacsScalar path[] = NULL);
   /**
     Get array sizes needed for a matrix-free matrix-vector product
 

@@ -218,6 +218,9 @@ class TACSAssembler : public TACSObject {
   void assembleMatType(ElementMatrixType matType, TACSMat *A,
                        MatrixOrientation matOr = TACS_MAT_NORMAL,
                        const TacsScalar lambda = 1.0);
+  void assembleNonlinearGmat(ElementMatrixType matType, TACSMat *A,
+                       MatrixOrientation matOr = TACS_MAT_NORMAL,
+                       const TacsScalar lambda = 1.0, TACSBVec *du = NULL);
   void assembleMatCombo(ElementMatrixType matTypes[], TacsScalar scale[],
                         int nmats, TACSMat *A,
                         MatrixOrientation matOr = TACS_MAT_NORMAL,

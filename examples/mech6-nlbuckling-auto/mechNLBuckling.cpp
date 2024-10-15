@@ -28,7 +28,7 @@ int main(int argc, char *argv[]) {
 
     double t = 0.002; // m 
     double Lr = 2.0; // default 2.0
-    double rt = 500; // 100, 50, 25
+    double rt = 100; // 100, 50, 25
     double R = t * rt; // m
     double L = R * Lr;
 
@@ -39,7 +39,7 @@ int main(int argc, char *argv[]) {
     // select nelems and it will select to retain isotropic elements (good element AR)
     // want dy = 2 * pi * R / ny the hoop elem spacing to be equal dx = L / nx the axial elem spacing
     // and want to choose # elems so that elements have good elem AR
-    int nelems = 5000; // prev 3500 // target (does round stuff)
+    int nelems = 10000; // prev 3500 // target (does round stuff)
     double pi = 3.14159265;
     double A = L / 2.0 / pi / R;
     double temp1 = sqrt(nelems * 1.0 / A);
@@ -50,7 +50,7 @@ int main(int argc, char *argv[]) {
 
     TacsScalar rho = 2700.0;
     TacsScalar specific_heat = 921.096;
-    TacsScalar E = 70e3;
+    TacsScalar E = 70e9;
     TacsScalar nu = 0.3;
     TacsScalar ys = 270.0;
     TacsScalar cte = 24.0e-6;
@@ -156,7 +156,7 @@ int main(int argc, char *argv[]) {
 
     // choose imperfection sizes for the cylinder based on the cylinder thickness
     // TacsScalar imperfection_sizes[3] = {0.5 * t, 0.1 * t, 0.05 * t}; // t is cylinder thickness here
-    TacsScalar imperfection_sizes[3] = {0.5 * t, 0.0, 0.0};
+    TacsScalar imperfection_sizes[3] = {0.5 / 3.0 * t, 0.5 / 3.0 * t, 0.5 / 3.0 * t};
 
     // apply the first few eigenmodes as geometric imperfections to the cylinder
     TACSBVec *phi = assembler->createVec();

@@ -3856,6 +3856,14 @@ void TACSAssembler::setVariables(TACSBVec *vars, TACSBVec *dvars,
   }
 }
 
+// void setTemperatures(TACSBVec *temps);
+// TODO : make input TACSBVec *temps next and then nodal temperatures everywhere..
+void TACSAssembler::setTemperatures(TacsScalar temp) {
+  for (int i = 0; i < numElements; i++) {
+        elements[i]->setTemperature(temp);
+  }
+}
+
 /**
   Copy the values directly without distributing them.
 

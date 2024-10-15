@@ -89,6 +89,8 @@ class TACSAssembler : public TACSObject {
   int setElements(TACSElement **_elements);
   int setDependentNodes(const int *_depNodeIndex, const int *_depNodeToTacs,
                         const double *_depNodeWeights);
+  // void setTemperatures(TACSBVec *temps);
+  void setTemperatures(TacsScalar temp);
 
   void getAverageStresses(ElementType elem_type, TacsScalar *avgStresses, int compNum);
   void setComplexStepGmatrix(bool flag);

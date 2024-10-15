@@ -23,15 +23,18 @@ int main(int argc, char *argv[]) {
     // Parameters optionally set from the command line
     int order = 2;
 
-    double t = 0.002; // m 
-    double L = 0.4; // m
-    double R = 0.2; // m
+    double t = 0.002; // m
+    double rt = 50.0;
+    double Lr = 2.0;
+
+    double R = rt * t; 
+    double L = Lr * R;    
     double udisp = -1e-5; // compressive udisp
 
     // select nelems and it will select to retain isotropic elements (good element AR)
     // want dy = 2 * pi * R / ny the hoop elem spacing to be equal dx = L / nx the axial elem spacing
     // and want to choose # elems so that elements have good elem AR
-    int nelems = 3500; // target (does round stuff)
+    int nelems = 10000; // target (does round stuff)
     double pi = 3.14159265;
     double A = L / 2.0 / pi / R;
     double temp1 = sqrt(nelems * 1.0 / A);
@@ -42,7 +45,7 @@ int main(int argc, char *argv[]) {
 
     TacsScalar rho = 2700.0;
     TacsScalar specific_heat = 921.096;
-    TacsScalar E = 70e3;
+    TacsScalar E = 70e9;
     TacsScalar nu = 0.3;
     TacsScalar ys = 270.0;
     TacsScalar cte = 24.0e-6;

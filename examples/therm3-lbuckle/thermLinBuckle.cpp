@@ -11,7 +11,9 @@
 #include "createCylinderDispControl.h"
 #include "TACSContinuation.h"
 
-// this example is based off of examples/crm/crm.cpp in TACS
+// this is a nonlinear buckling example of a cylinder under mechanical loading
+// with applied geometric imperfections. The load factor for nonlinear buckling is determined automatically.
+// and the KDF (ratio of NL load factor / Linear load factor for buckling) or knockdown factor is computed and saved.
 
 int main(int argc, char *argv[]) {
     MPI_Init(&argc, &argv);
@@ -25,14 +27,17 @@ int main(int argc, char *argv[]) {
     int order = 2;
 
     double t = 0.002; // m 
-    double L = 0.4; // m
-    double R = 0.2; // m
-    double udisp = -1e-5; // compressive udisp
+    double Lr = 2.0; // default 2.0
+    double rt = 100; // 100, 50, 25
+    double R = t * rt; // m
+    double L = R * Lr;
+
+    double udisp = 0.0; // no compressive disp (compressive strain from heating only)
 
     // select nelems and it will select to retain isotropic elements (good element AR)
     // want dy = 2 * pi * R / ny the hoop elem spacing to be equal dx = L / nx the axial elem spacing
     // and want to choose # elems so that elements have good elem AR
-    int nelems = 5000; // prev 3500 // target (does round stuff)
+    int nelems = 10000; // prev 3500 // target (does round stuff)
     double pi = 3.14159265;
     double A = L / 2.0 / pi / R;
     double temp1 = sqrt(nelems * 1.0 / A);
@@ -48,27 +53,47 @@ int main(int argc, char *argv[]) {
     TacsScalar ys = 270.0;
     TacsScalar cte = 24.0e-6;
     TacsScalar kappa = 230.0;
-    TACSMaterialProperties *props =
-        new TACSMaterialProperties(rho, specific_heat, E, nu, ys, cte, kappa);
+    TACSMaterialProperties *props = new TACSMaterialProperties(rho, specific_heat, E, nu, ys, cte, kappa);
 
     // TacsScalar axis[] = {1.0, 0.0, 0.0};
     // TACSShellTransform *transform = new TACSShellRefAxisTransform(axis);
     TACSShellTransform *transform = new TACSShellNaturalTransform();
-
     TACSShellConstitutive *con = new TACSIsoShellConstitutive(props, t);
 
     TACSAssembler *assembler = NULL;
     TACSCreator *creator = NULL;
     TACSElement *shell = NULL;
-    // needs to be nonlinear here otherwise solve will terminate immediately
+
+    // why do I get such different answers with the nonlinear shell than the linear one?
     shell = new TACSQuad4NonlinearShell(transform, con); 
+    // shell = new TACSQuad4Shell(transform, con); 
     shell->incref();
+
     createAssembler(comm, order, nx, ny, udisp, L, R, shell, &assembler, &creator);
 
-    // Solve the linear static analysis
-    if (rank == 0) {
-        printf("Solving linear system..\n");
+    // set the temperatures into the structure
+    TacsScalar temperature = 1.0; // default 1.0 // 1 deg K
+    int numElements = assembler->getNumElements();
+    
+    TACSQuad4NonlinearShell *elem;
+    for (int ielem = 0; ielem < numElements; ielem++) {
+        elem = dynamic_cast<TACSQuad4NonlinearShell *>(assembler->getElement(ielem));
+        elem->setTemperature(temperature);
+        #ifdef TACS_USE_COMPLEX
+            elem->setComplexStepGmatrix(true);
+        #endif
     }
+
+    // it appears that the linear buckling works correctly with the linear shell element
+    // not the nonlinear one..
+    // TACSQuad4Shell *elem;
+    // for (int ielem = 0; ielem < numElements; ielem++) {
+    //     elem = dynamic_cast<TACSQuad4Shell *>(assembler->getElement(ielem));
+    //     elem->setTemperature(temperature);
+    //     #ifdef TACS_USE_COMPLEX
+    //         elem->setComplexStepGmatrix(true);
+    //     #endif
+    // }
     
     // Create the design vector
     TACSBVec *x = assembler->createDesignVec();
@@ -132,7 +157,7 @@ int main(int argc, char *argv[]) {
     lbuckle_gmres->setTolerances(1e-12, 1e-12);
 
     // make the buckling solver
-    TacsScalar sigma = 0.01; // need high enough num_eigvals to get it right
+    TacsScalar sigma = 0.1; // need high enough num_eigvals to get it right
     int max_lanczos_vecs = 300, num_eigvals = 50; // num_eigvals = 50;
     double eig_tol = 1e-12;
 
@@ -145,88 +170,9 @@ int main(int argc, char *argv[]) {
     ksm_print->incref();
 
     // solve the buckling analysis
-    TACSBVec *u0_temp = NULL, *f0_temp = NULL;
-    buckling->solve(f0_temp, u0_temp, ksm_print_buckling);
+    buckling->setSigma(10.0);
+    buckling->solve(NULL, NULL, ksm_print_buckling);
     // exit(0);
-
-    // choose imperfection sizes for the cylinder based on the cylinder thickness
-    TacsScalar imperfection_sizes[3] = {0.5 * t, 0.1 * t, 0.05 * t}; // t is cylinder thickness here
-
-    // apply the first few eigenmodes as geometric imperfections to the cylinder
-    TACSBVec *phi = assembler->createVec();
-    TACSBVec *xpts = assembler->createNodeVec();
-    TACSBVec *phi_uvw = assembler->createNodeVec();
-    assembler->getNodes(xpts);
-    phi->incref();
-    TacsScalar error;
-    for (int imode = 0; imode < 3; imode++) {
-        buckling->extractEigenvector(imode, phi, &error);
-        // if (imode == 0) {
-        //     assembler->setVariables(phi);
-        // }
-
-        // copy the phi for all 6 shell dof into phi_uvw
-        // how to copy every 3 out of 6 values from 
-        TacsScalar *phi_x, *phi_uvw_x;
-        int varSize = phi->getArray(&phi_x);
-        int nodeSize = phi_uvw->getArray(&phi_uvw_x);
-        int ixpts = 0;
-        for (int iphi = 0; iphi < varSize; iphi++) {
-            int idof = iphi % 6;
-            if (idof > 2) { // skip rotx, roty, rotz components of eigenvector
-                continue;
-            }
-            // printf("iphi %d, idof %d\n", iphi, idof);
-            // printf("phi_x at %d / %d\n", iphi, varSize);
-            // printf("phi_uvw_x at %d / %d\n", ixpts, nodeSize);
-            phi_uvw_x[ixpts] = phi_x[iphi];
-            ixpts++;
-        }
-        xpts->axpy(imperfection_sizes[imode], phi_uvw); 
-        // xpts->axpy(imperfection_sizes[imode] * 100.0, phi_uvw); 
-    }
-    assembler->setNodes(xpts);
-    // previously wrote out to f5 here in order to see the geometric imperfection
-
-    // end of TACS linear buckling analysis for the geometric imperfections
-    // ---------------------------------------------------------------------------------------
-    
-    // start the nonlinear static analysis, with linear buckling used to check for nonlinear buckling
-    // ---------------------------------------------------------------------------------------
-    // ---------------------------------------------------------------------------------------
-
-    // first just // inputs to the TACSContinuation solver    
-    int max_continuation_iters = 100; // default 300 // for prelim Newton solve to lambda_init
-    int max_correction_iters = 100; // for the arc length method static regime
-    int max_correction_restarts = 2; // restart for nonlinear static regime
-    double corr_rtol = 1e-3; // this needs improvement and an atol (since already fairly low)
-    double corr_dtol = 1e3; // if divergence tolerance is huge it's failing to solve and breaks out prelim newton loop
-    double krylov_rtol = 1e-6; // krylov refers to the second solve where it reaches more severe loss of stability
-    double krylov_atol = 1e-10; 
-    double tangent_rtol = 1e-6; // for prelim newton solve section
-    double tangent_atol = 1e-10;
-    TACSContinuationCallback *callback = new TACSContinuationCallback(comm, "nlstatic.out");
-
-    // make the TACSContinuation solver for nonlinear static analysis
-    TACSContinuation *continuation = new TACSContinuation(
-        assembler, max_continuation_iters, max_correction_iters, max_correction_restarts,
-        corr_rtol, corr_dtol, krylov_rtol, krylov_atol, tangent_rtol, tangent_atol
-    );
-    continuation->incref();
-
-    // solve the nonlinear static analysis
-    double lambda_init = 280.0 * 0.2; // start at 50% the predicted linear buckling load (change this depending on case)
-    double target_delta_lambda = 5.0;
-    // right now based on 100 steps and it is canging lambda by about 4-5 each time, we reach lambd aof 
-    printf("solve tangent::\n");
-    continuation->solve_tangent(
-        kmat, pc, gmres, f, lambda_init, target_delta_lambda,
-        ksm_print, callback
-    );
-
-
-    // end of nonlinear static analysis for nonlinear buckling
-    // ---------------------------------------------------------------------------------------
 
     // Create an TACSToFH5 object for writing output to files
     int write_flag = (TACS_OUTPUT_CONNECTIVITY | TACS_OUTPUT_NODES |
@@ -235,9 +181,20 @@ int main(int argc, char *argv[]) {
     TACSToFH5 *f5 =
         new TACSToFH5(assembler, TACS_BEAM_OR_SHELL_ELEMENT, write_flag);
     f5->incref();
-    // copy solution out of nonlinear static and write to file
-    // already in the assembler
-    f5->writeToFile("mech-nl-cylinder.f5");
+
+    // write each of the buckling modes to a file
+    
+    TACSBVec *phi = assembler->createVec();
+    phi->incref();
+    TacsScalar error;
+    for (int imode = 0; imode < num_eigvals; imode++) {
+        buckling->extractEigenvector(imode, phi, &error);
+        assembler->setVariables(phi);   
+        std::string filename = "_buckling/mech-buckle" + std::to_string(imode) + ".f5";
+        const char *cstr_filename = filename.c_str();
+        f5->writeToFile(cstr_filename);
+    }    
+    
 
     MPI_Finalize();
 

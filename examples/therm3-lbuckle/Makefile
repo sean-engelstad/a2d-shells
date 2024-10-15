@@ -1,13 +1,13 @@
 include ../../Makefile.in
 include ../../A2D_SHELLS.mk
 
-LOCAL_OBJS = thermNLStatic.o
-EXECS = therm-nlstatic.x
+LOCAL_OBJS = thermLinBuckle.o
+EXECS = therm-linbuckle.x
 
 default: ${LOCAL_OBJS} ${EXECS}
 
-therm-nlstatic.x:
-	${CXX} -o therm-nlstatic.x thermNLStatic.o ${TACS_LD_FLAGS}
+therm-linbuckle.x:
+	${CXX} -o therm-linbuckle.x thermLinBuckle.o ${TACS_LD_FLAGS}
 
 debug: TACS_CC_FLAGS=${TACS_DEBUG_CC_FLAGS}
 debug: default

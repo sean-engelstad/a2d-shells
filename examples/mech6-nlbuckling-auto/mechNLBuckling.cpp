@@ -50,7 +50,7 @@ int main(int argc, char *argv[]) {
 
     TacsScalar rho = 2700.0;
     TacsScalar specific_heat = 921.096;
-    TacsScalar E = 70e9;
+    TacsScalar E = 70e3; // 70e9
     TacsScalar nu = 0.3;
     TacsScalar ys = 270.0;
     TacsScalar cte = 24.0e-6;
@@ -137,7 +137,7 @@ int main(int argc, char *argv[]) {
     lbuckle_gmres->setTolerances(1e-12, 1e-12);
 
     // make the buckling solver
-    TacsScalar sigma = 10.0; // need high enough num_eigvals to get it right
+    TacsScalar sigma = 0.01; // need high enough num_eigvals to get it right
     int max_lanczos_vecs = 300, num_eigvals = 50; // num_eigvals = 50;
     double eig_tol = 1e-12;
 

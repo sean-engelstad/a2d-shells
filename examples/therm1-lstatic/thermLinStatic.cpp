@@ -18,13 +18,11 @@
   creator object
 */
 void createAssembler(MPI_Comm comm, int order, int nx, int ny, TacsScalar udisp,
+                     double R, double L,
                      TACSElement *element, TACSAssembler **_assembler,
                      TACSCreator **_creator) {
   int rank;
   MPI_Comm_rank(comm, &rank);
-
-  double L = 100.0;
-  double R = 100.0 / M_PI;
   double defect = 0.1;
 
   // Set the alpha and beta parameters
@@ -194,17 +192,26 @@ int main(int argc, char *argv[]) {
 
   // Parameters optionally set from the command line
   int order = 2;
-  int nx = 20, ny = 40;
-  int mesh_type = 0;
+  
+  double t = 0.002; // m 
+  double Lr = 2.0; // default 2.0
+  double rt = 100; // 100, 50, 25
+  double R = t * rt; // m
+  double L = R * Lr;
 
-  double t = 1.0;
-  double L = 100.0;
-  double R = 100.0 / M_PI;
-  double udisp = -1e-5; // compressive udisp
+  double udisp = 0.0; // no compressive disp (compressive strain from heating only)
 
-  // Set the alpha and beta parameters
-  double alpha = 4.0 / R;
-  double beta = 3 * M_PI / L;
+  // select nelems and it will select to retain isotropic elements (good element AR)
+  // want dy = 2 * pi * R / ny the hoop elem spacing to be equal dx = L / nx the axial elem spacing
+  // and want to choose # elems so that elements have good elem AR
+  int nelems = 5000; // prev 3500 // target (does round stuff)
+  double pi = 3.14159265;
+  double A = L / 2.0 / pi / R;
+  double temp1 = sqrt(nelems * 1.0 / A);
+  int ny = (int)temp1;
+  double temp2 = A * ny;
+  int nx = (int)temp2;
+  printf("nx = %d, ny = %d\n", nx, ny);
 
   TacsScalar rho = 2700.0;
   TacsScalar specific_heat = 921.096;
@@ -226,7 +233,7 @@ int main(int argc, char *argv[]) {
   TACSElement *shell = NULL;
   shell = new TACSQuad4Shell(transform, con);
   shell->incref();
-  createAssembler(comm, order, nx, ny, udisp, shell, &assembler, &creator);
+  createAssembler(comm, order, nx, ny, udisp, R, L, shell, &assembler, &creator);
   
 
   assembler->incref();
@@ -251,6 +258,8 @@ int main(int argc, char *argv[]) {
   int reorder_schur = 1;
   TACSSchurPc *pc = new TACSSchurPc(mat, lev, fill, reorder_schur);
   pc->incref();
+
+  assembler->setTemperatures(10.0); // 10 K
 
   // apply displacement control BCs to the residual
   assembler->applyBCs(res);

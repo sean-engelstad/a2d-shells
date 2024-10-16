@@ -32,7 +32,8 @@ void getNonlinearBucklingKDF(MPI_Comm comm, int run, double rt, double Lr = 2.0,
 
     TacsScalar rho = 2700.0;
     TacsScalar specific_heat = 921.096;
-    TacsScalar E = 70e3; // 70e9
+    TacsScalar E = 70e3; // 70e9 (lower value of E helps solve more accurately, doesn't affect buckling loads with disp control)
+    // it just affects scale of energy and numerical issues in the SEP solver (so better to have lower E here)
     TacsScalar nu = 0.3;
     TacsScalar ys = 270.0;
     TacsScalar cte = 24.0e-6;
@@ -162,6 +163,7 @@ void getNonlinearBucklingKDF(MPI_Comm comm, int run, double rt, double Lr = 2.0,
         int varSize = phi->getArray(&phi_x);
         int nodeSize = phi_uvw->getArray(&phi_uvw_x);
         int ixpts = 0;
+        TacsScalar max_uvw = 0.0;
         for (int iphi = 0; iphi < varSize; iphi++) {
             int idof = iphi % 6;
             if (idof > 2) { // skip rotx, roty, rotz components of eigenvector
@@ -172,7 +174,17 @@ void getNonlinearBucklingKDF(MPI_Comm comm, int run, double rt, double Lr = 2.0,
             // printf("phi_uvw_x at %d / %d\n", ixpts, nodeSize);
             phi_uvw_x[ixpts] = phi_x[iphi];
             ixpts++;
+            TacsScalar abs_disp = abs(TacsRealPart(phi_x[iphi]));
+            if (abs_disp > max_uvw) {
+                max_uvw = abs_disp;
+            }
         }
+        
+        // normalize the mode by the max uvw disp
+        for (int i = 0; i < ixpts; i++) {
+            phi_uvw_x[i] /= max_uvw;
+        }
+
         xpts->axpy(imperfection_sizes[imode], phi_uvw); 
         // xpts->axpy(imperfection_sizes[imode] * 100.0, phi_uvw); 
     }

@@ -180,6 +180,7 @@ int main(int argc, char *argv[]) {
         int varSize = phi->getArray(&phi_x);
         int nodeSize = phi_uvw->getArray(&phi_uvw_x);
         int ixpts = 0;
+        TacsScalar max_uvw = 0.0;
         for (int iphi = 0; iphi < varSize; iphi++) {
             int idof = iphi % 6;
             if (idof > 2) { // skip rotx, roty, rotz components of eigenvector
@@ -190,6 +191,15 @@ int main(int argc, char *argv[]) {
             // printf("phi_uvw_x at %d / %d\n", ixpts, nodeSize);
             phi_uvw_x[ixpts] = phi_x[iphi];
             ixpts++;
+            TacsScalar abs_disp = abs(TacsRealPart(phi_x[iphi]));
+            if (abs_disp > max_uvw) {
+                max_uvw = abs_disp;
+            }
+        }
+        
+        // normalize the mode by the max uvw disp
+        for (int i = 0; i < ixpts; i++) {
+            phi_uvw_x[i] /= max_uvw;
         }
         xpts->axpy(imperfection_sizes[imode], phi_uvw); 
         // xpts->axpy(imperfection_sizes[imode] * 100.0, phi_uvw); 

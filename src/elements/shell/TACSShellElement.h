@@ -719,6 +719,8 @@ void TACSShellElement<quadrature, basis, director, model>::getMatType(
       }
     }
 
+    TacsScalar temp_orig = temperature; // for NL element which we need to change in place
+
     // compute norm for normalizing path vec
     norm = 0.0;
     for (int i = 0; i < vars_per_node * num_nodes; i++) {
@@ -726,7 +728,7 @@ void TACSShellElement<quadrature, basis, director, model>::getMatType(
     }
 
     // include thermal path in norm
-    norm += temperature * temperature;
+    norm += temp_orig * temp_orig;
 
     if (TacsRealPart(norm) == 0.0) {
       norm = 1.0;
@@ -745,8 +747,19 @@ void TACSShellElement<quadrature, basis, director, model>::getMatType(
 
     // temperature perturbation as well (for thermal buckling)
     TacsScalar my_dh = dh_mag;
-    nlElem->setTemperature(temperature + my_dh * temperature / norm);
+    nlElem->setTemperature(temp_orig + my_dh * temp_orig / norm);
     // printf("temperature1 = %.8e\n", nlElem->getTemperature());
+
+    // compare inputs btw two LIN and NL models (debug)
+    // printf("Gelem + pert\n");
+    // printf("alpha = %.8e\n", alpha);
+    // printf("temp = %.8e\n", nlElem->getTemperature());
+    // for (int i = 0; i < 24; i++) {
+    //   printf("path[%d] = %.8e\n", i, path[i]);
+    // }
+    // for (int i2 = 0; i2 < 24; i2++) {
+    //   printf("vars[%d] = %.8e\n", i2, vars[i2]);
+    // }
 
     nlElem->addJacobian(elemIndex, time, alpha, beta, gamma, Xpts, path, vars,
                         vars, res, mat);
@@ -757,8 +770,19 @@ void TACSShellElement<quadrature, basis, director, model>::getMatType(
     }
 
     // temperature perturbation as well (for thermal buckling)
-    nlElem->setTemperature(temperature - my_dh * temperature / norm);
+    nlElem->setTemperature(temp_orig - my_dh * temp_orig / norm);
     // printf("temperature2 = %.8e\n", nlElem->getTemperature());
+
+    // compare inputs btw two LIN and NL models (debug)
+    // printf("Gelem - pert\n");
+    // printf("alpha = %.8e\n", alpha);
+    // printf("temp = %.8e\n", nlElem->getTemperature());
+    // for (int i = 0; i < 24; i++) {
+    //   printf("path[%d] = %.8e\n", i, path[i]);
+    // }
+    // for (int i2 = 0; i2 < 24; i2++) {
+    //   printf("vars[%d] = %.8e\n", i2, vars[i2]);
+    // }
 
     nlElem->addJacobian(elemIndex, time, -alpha, beta, gamma, Xpts, path, vars,
                         vars, res, mat);
@@ -774,13 +798,28 @@ void TACSShellElement<quadrature, basis, director, model>::getMatType(
     }
 #endif  // TACS_USE_COMPLEX
 
+    // debug: print Kelem
+    // int N = 24;
+    // for (int i = 0; i < N * N; i++) {
+    //   printf("Gelem[%d] = %.8e\n", i, mat[i]);
+    // }  
+
     delete[] path;
+
+    // for nonlinear elements reset temp
+    nlElem->setTemperature(temp_orig);
 
     return;
   }
   // Add appropriate Jacobian to matrix
   addJacobian(elemIndex, time, alpha, beta, gamma, Xpts, vars, vars, vars, res,
               mat);
+
+  // // debug: print Kelem
+  // int N = 24;
+  // for (int i = 0; i < N * N; i++) {
+  //   printf("Kelem[%d] = %.8e\n", i, mat[i]);
+  // }  
 }
 
 template <class quadrature, class basis, class director, class model>

@@ -65,8 +65,14 @@ int main(int argc, char *argv[]) {
     TACSElement *shell = NULL;
 
     // why do I get such different answers with the nonlinear shell than the linear one?
-    shell = new TACSQuad4NonlinearShell(transform, con); 
-    // shell = new TACSQuad4Shell(transform, con); 
+
+    // toggle on and off nonlinear vs linear element (1 vs 0)
+    #define NONLINEAR_ELEM 1
+    #if NONLINEAR_ELEM
+        shell = new TACSQuad4NonlinearShell(transform, con); 
+    #else
+        shell = new TACSQuad4Shell(transform, con); 
+    #endif
     shell->incref();
 
     createAssembler(comm, order, nx, ny, udisp, L, R, shell, &assembler, &creator);
@@ -74,27 +80,28 @@ int main(int argc, char *argv[]) {
     // set the temperatures into the structure
     TacsScalar temperature = 1.0; // default 1.0 // 1 deg K
     int numElements = assembler->getNumElements();
-    
-    TACSQuad4NonlinearShell *elem;
-    for (int ielem = 0; ielem < numElements; ielem++) {
-        elem = dynamic_cast<TACSQuad4NonlinearShell *>(assembler->getElement(ielem));
-        elem->setTemperature(temperature);
-        #ifdef TACS_USE_COMPLEX
-            elem->setComplexStepGmatrix(true);
-        #endif
-    }
 
-    // it appears that the linear buckling works correctly with the linear shell element
-    // not the nonlinear one..
-    // TACSQuad4Shell *elem;
-    // for (int ielem = 0; ielem < numElements; ielem++) {
-    //     elem = dynamic_cast<TACSQuad4Shell *>(assembler->getElement(ielem));
-    //     elem->setTemperature(temperature);
-    //     #ifdef TACS_USE_COMPLEX
-    //         elem->setComplexStepGmatrix(true);
-    //     #endif
-    // }
+    #if NONLINEAR_ELEM
+        TACSQuad4NonlinearShell *elem;
+        for (int ielem = 0; ielem < numElements; ielem++) {
+            elem = dynamic_cast<TACSQuad4NonlinearShell *>(assembler->getElement(ielem));
+            elem->setTemperature(temperature);
+            #ifdef TACS_USE_COMPLEX
+                elem->setComplexStepGmatrix(true);
+            #endif
+        }
+    #else
+        TACSQuad4Shell *elem;
+        for (int ielem = 0; ielem < numElements; ielem++) {
+            elem = dynamic_cast<TACSQuad4Shell *>(assembler->getElement(ielem));
+            elem->setTemperature(temperature);
+            #ifdef TACS_USE_COMPLEX
+                elem->setComplexStepGmatrix(true);
+            #endif
+        }
+    #endif
     
+
     // Create the design vector
     TACSBVec *x = assembler->createDesignVec();
     x->incref();
@@ -170,7 +177,7 @@ int main(int argc, char *argv[]) {
     ksm_print->incref();
 
     // solve the buckling analysis
-    buckling->setSigma(10.0);
+    buckling->setSigma(0.1);
     buckling->solve(NULL, NULL, ksm_print_buckling);
     // exit(0);
 

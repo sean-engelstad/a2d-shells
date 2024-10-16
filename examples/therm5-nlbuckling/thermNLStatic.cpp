@@ -51,7 +51,7 @@ int main(int argc, char *argv[]) {
     TacsScalar E = 70e9;
     TacsScalar nu = 0.3;
     TacsScalar ys = 270.0;
-    TacsScalar cte = 24.0e-6;
+    TacsScalar cte = 10.0e-6;
     TacsScalar kappa = 230.0;
     TACSMaterialProperties *props = new TACSMaterialProperties(rho, specific_heat, E, nu, ys, cte, kappa);
 
@@ -69,7 +69,7 @@ int main(int argc, char *argv[]) {
     createAssembler(comm, order, nx, ny, udisp, L, R, shell, &assembler, &creator);
 
     // set the temperatures into the structure
-    TacsScalar temperature = 10.0; // default 1.0 // 1 deg K
+    TacsScalar temperature = 1.0; // default 1.0 // 1 deg K
     int numElements = assembler->getNumElements();
     TACSQuad4NonlinearShell *elem;
     for (int ielem = 0; ielem < numElements; ielem++) {
@@ -160,7 +160,8 @@ int main(int argc, char *argv[]) {
     // exit(0);
 
     // choose imperfection sizes for the cylinder based on the cylinder thickness
-    TacsScalar imperfection_sizes[3] = {0.5 * t, 0.0, 0.0}; // t is cylinder thickness here
+    // TacsScalar imperfection_sizes[3] = {0.5 * t, 0.0, 0.0}; // t is cylinder thickness here
+    TacsScalar imperfection_sizes[3] = {0.3 * t, 0.1 * t, 0.1 * t}; // t is cylinder thickness here
     // TacsScalar imperfection_sizes[3] = {0.5 / 3.0 * t, 0.5 / 3.0 * t, 0.5 / 3.0 * t};
 
     // apply the first few eigenmodes as geometric imperfections to the cylinder
@@ -185,6 +186,7 @@ int main(int argc, char *argv[]) {
         int varSize = phi->getArray(&phi_x);
         int nodeSize = phi_uvw->getArray(&phi_uvw_x);
         int ixpts = 0;
+        TacsScalar max_uvw = 0.0;
         for (int iphi = 0; iphi < varSize; iphi++) {
             int idof = iphi % 6;
             if (idof > 2) { // skip rotx, roty, rotz components of eigenvector
@@ -195,7 +197,17 @@ int main(int argc, char *argv[]) {
             // printf("phi_uvw_x at %d / %d\n", ixpts, nodeSize);
             phi_uvw_x[ixpts] = phi_x[iphi];
             ixpts++;
+            TacsScalar abs_disp = abs(TacsRealPart(phi_x[iphi]));
+            if (abs_disp > max_uvw) {
+                max_uvw = abs_disp;
+            }
         }
+        
+        // normalize the mode by the max uvw disp
+        for (int i = 0; i < ixpts; i++) {
+            phi_uvw_x[i] /= max_uvw;
+        }
+
         xpts->axpy(imperfection_sizes[imode], phi_uvw); 
         // xpts->axpy(imperfection_sizes[imode] * 100.0, phi_uvw); 
     }
@@ -240,7 +252,7 @@ int main(int argc, char *argv[]) {
 
     // nonlinear static important input settings
     // ------------------------------------------------------------
-    double lambda_init = 280.0 * 0.05;
+    double lambda_init = 181.0 * 0.05;
     double target_delta_lambda = 5.0;
     int max_continuation_iters = 300; // default 300 // for prelim Newton solve to lambda_init
     int max_correction_iters = 100; // for the arc length method static regime
@@ -253,7 +265,7 @@ int main(int argc, char *argv[]) {
     double tangent_rtol = 1e-6; // for prelim newton solve section
     double tangent_atol = 1e-10;
     int num_arclength_per_lbuckle = 10; // 5 is default // num arc length steps for each linear buckling check
-    double min_NL_eigval = 0.5; // default is 1.0 or 0.5
+    double min_NL_eigval = 0.01; // default is 1.0 or 0.5
     // for some reason SEP solver can't drive eigenvalue below zero with shift and invert (needs work)
     bool hit_buckling = false;
     TacsScalar nonlinear_eigval;
@@ -506,15 +518,6 @@ int main(int argc, char *argv[]) {
             //     but then if |du| is much smaller than |u|, the lambda does not predict multiples on original lambda correctly
             buckling->solve_local(NULL, vars, ksm_print_buckling, delta_vars);
 
-            // option 2 - finds K_t(u) + lambda * |u| * d/ds K_t(u + s * u / |u|)
-            //     then easier to determine predicted final lambda for final buckling..
-            // buckling->solve(NULL, vars, ksm_print_buckling, NULL); // this one gives G(u,u)
-            eigval = buckling->extractEigenvalue(0, &loc_error);
-            if (TacsRealPart(eigval) < TacsRealPart(min_NL_eigval)) {
-                nonlinear_eigval = lambda;
-                break; // break out of the arc length loop and we are done with nonlinear buckling!
-            }
-
             // would also really like to write out the linear eigenvalues and |u|, etc. to a custom buckling .out file
             // so we can monitor the progress as it moves towards nonlinear buckling
 
@@ -528,6 +531,15 @@ int main(int argc, char *argv[]) {
                     TacsRealPart(eigval), TacsRealPart(loc_error), TacsRealPart(linear_eigval), 
                     TacsRealPart(pred_lambda_NL));
                 fflush(fp);
+            }
+
+            // option 2 - finds K_t(u) + lambda * |u| * d/ds K_t(u + s * u / |u|)
+            //     then easier to determine predicted final lambda for final buckling..
+            // buckling->solve(NULL, vars, ksm_print_buckling, NULL); // this one gives G(u,u)
+            eigval = buckling->extractEigenvalue(0, &loc_error);
+            if (TacsRealPart(eigval) < TacsRealPart(min_NL_eigval)) {
+                nonlinear_eigval = lambda;
+                break; // break out of the arc length loop and we are done with nonlinear buckling!
             }
 
         }

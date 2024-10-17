@@ -28,7 +28,7 @@ int main(int argc, char *argv[]) {
 
     double t = 0.002; // m 
     double Lr = 2.0; // default 2.0
-    double rt = 100; // 100, 50, 25
+    double rt = 10; // 100, 50, 25
     double R = t * rt; // m
     double L = R * Lr;
 
@@ -197,7 +197,7 @@ int main(int argc, char *argv[]) {
     for (int imode = 0; imode < num_eigvals; imode++) {
         buckling->extractEigenvector(imode, phi, &error);
         assembler->setVariables(phi);   
-        std::string filename = "_buckling/mech-buckle" + std::to_string(imode) + ".f5";
+        std::string filename = "_buckling/therm-buckle" + std::to_string(imode) + ".f5";
         const char *cstr_filename = filename.c_str();
         f5->writeToFile(cstr_filename);
     }    

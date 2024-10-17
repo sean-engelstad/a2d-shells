@@ -25,12 +25,13 @@ int main(int argc, char *argv[]) {
     MPI_Comm comm = MPI_COMM_WORLD;
 
     double rtVals[7] = {1000.0, 500.0, 300.0, 100.0, 50.0, 25.0, 10.0};
+    int meshSizes[7] = {4e4, 2e4, 1e4, 1e4, 1e4, 1e4, 1e4};
     
     // run each KDF simulation for mechanical nonlinear buckling
     for (int irun = 0; irun < 7; irun++) {
         double rt = rtVals[irun];
         double Lr = 2.0;
-        int nelems = 20000; // 5000, 10000
+        int nelems = meshSizes[irun]; // 5000, 10000
         getNonlinearBucklingKDF(comm, irun+1, rt, 2.0, nelems);
     }   
 

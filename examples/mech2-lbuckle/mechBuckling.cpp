@@ -24,7 +24,7 @@ int main(int argc, char *argv[]) {
     int order = 2;
 
     double t = 0.002; // m
-    double rt = 50.0;
+    double rt = 100.0;
     double Lr = 2.0;
 
     double R = rt * t; 

@@ -524,6 +524,23 @@ void TACSShellElementOrig<quadrature, basis, director, model>::addJacobian(
     TacsScalar gty[6];  // The symmetric components of the tying strain
     basis::interpTyingStrain(pt, ety, gty);
 
+    // debug print out intermediate states for interpolations up to this point
+    // printf("et = %.8e\n", et);
+    // for (int i = 0; i < 3; i++) {
+    //   printf("X[%d] = %.8e\n", i, X[i]);
+    //   printf("n0[%d] = %.8e\n", i, n0[i]);
+    //   // printf("d0[%d] = %.8e\n", i, d0[i]);
+    // }
+    // for (int j = 0; j < 6; j++) {
+    //   printf("Xxi[%d] = %.8e\n", j, Xxi[j]);
+    //   // printf("nxi[%d] = %.8e\n", j, nxi[j]);
+    //   // printf("d0xi[%d] = %.8e\n", j, d0xi[j]);
+    //   printf("gty[%d] = %.8e\n", j, gty[j]);
+    // }
+    // // for (int k = 0; k < 12; k++) {
+    // //   printf("u0xi[%d] = %.8e\n", k, u0xi[k]);
+    // // }
+
     // Compute the symmetric parts of the tying strain
     TacsScalar e0ty[6];  // e0ty = XdinvT^{T}*gty*XdinvT
     mat3x3SymmTransformTranspose(XdinvT, gty, e0ty);
@@ -549,6 +566,22 @@ void TACSShellElementOrig<quadrature, basis, director, model>::addJacobian(
     // with respect to u0x, u1x and e0ty
     TacsScalar du0x[9], du1x[9], de0ty[6];
     model::evalStrainSens(detXd, s, u0x, u1x, du0x, du1x, de0ty);
+
+    for (int j = 0; j < 6; j++) {
+      printf("e0ty[%d] = %.8e\n", j, e0ty[j]);
+    }
+    for (int i = 0; i < 9; i++) {
+      printf("u0x[%d] = %.8e\n", i, u0x[i]);
+      printf("u1x[%d] = %.8e\n", i, u1x[i]);
+      printf("E[%d] = %.8e\n", i, e[i]);
+      printf("S[%d] = %.8e\n", i, s[i]);
+    }
+    // for debugging purposes
+    TacsScalar Uelem =
+        0.5 * detXd *
+        (s[0] * e[0] + s[1] * e[1] + s[2] * e[2] + s[3] * e[3] + s[4] * e[4] +
+         s[5] * e[5] + s[6] * e[6] + s[7] * e[7] + s[8] * e[8]);
+    printf("Uelem = %.8e\n", Uelem);
 
     TacsScalar d2u0x[81], d2u1x[81], d2u0xu1x[81];
     TacsScalar d2e0ty[36], d2e0tyu0x[54], d2e0tyu1x[54];

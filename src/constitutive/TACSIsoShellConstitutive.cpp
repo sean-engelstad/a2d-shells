@@ -190,7 +190,11 @@ void TACSIsoShellConstitutive::evalStress(int elemIndex, const double pt[],
 
 int TACSIsoShellConstitutive::symind(int irow, int icol, int N) {
   // get the symind of a vector storage of symmat size N x N
-  return icol + (N+1)*N / 2 - (N+1-irow)*(N+1-irow-1)/2;
+  if (irow <= icol) {
+    return N * irow + icol - irow * (irow + 1) / 2.0;
+  } else {
+    return symind(icol,irow,N);
+  } 
 };
 
 // Evaluate the stress
@@ -231,24 +235,50 @@ void TACSIsoShellConstitutive::getABDmatrix(int elemIndex, const double pt[], co
     //        [0, 0, 0, drill]]
 
     for (int irow = 0; irow < 9; irow++) {
-      for (int icol = irow; icol < 9; icol++) {
+      for (int icol = 0; icol < 9; icol++) {
         if (irow < 3 && icol < 3) {
           // copy the A matrix
-          ABD[symind(irow,icol,9)] = A[symind(irow,icol,3)];
+          ABD[9 * irow + icol] = A[symind(irow,icol,3)];
         } else if (irow < 3 && 3 < icol && icol < 6) {
-          // copy the B matrix
-          ABD[symind(irow,icol,9)] = B[symind(irow,icol-3,3)];
-        } else if (3 < irow && irow < 6 && 3 < icol && icol < 6) {
+          // copy the B matrix on the upper triangular portion
+          ABD[9 * irow + icol] = B[symind(irow,icol-3,3)];
+        } else if (icol < 3 && 3 < irow && irow < 6) {
+          // copy the B^T matrix on the lower triangular portion
+          ABD[9 * irow + icol] = B[symind(icol, irow-3,3)];
+        } else if (3 <= irow && irow < 6 && 3 <= icol && icol < 6) {
           // copy the D matrix
-          ABD[symind(irow,icol,9)] = D[symind(irow-3,icol-3,3)];
+          ABD[9 * irow + icol] = D[symind(irow-3,icol-3,3)];
         } else if ((irow == 6 && icol == 6) or (irow == 7 && icol == 7)) {
           // copy the As transverse shear matrix
-          ABD[symind(irow,icol,9)] = As[irow-6];
+          ABD[9 * irow + icol] = As[0];
         } else if (irow == 8 && icol == 8) {
-          ABD[symind(irow,icol,9)] = drill;
+          printf("put drill = %.8e in loc %d\n", drill, 9 * irow + icol);
+          ABD[9 * irow + icol] = drill;
         }
       }
     }
+
+    // fix A2D SymMat * vec later    
+    // for (int irow = 0; irow < 9; irow++) {
+    //   for (int icol = irow; icol < 9; icol++) {
+    //     if (irow < 3 && icol < 3) {
+    //       // copy the A matrix
+    //       ABD[symind(irow,icol,9)] = A[symind(irow,icol,3)];
+    //     } else if (irow < 3 && 3 < icol && icol < 6) {
+    //       // copy the B matrix
+    //       ABD[symind(irow,icol,9)] = B[symind(irow,icol-3,3)];
+    //     } else if (3 < irow && irow < 6 && 3 < icol && icol < 6) {
+    //       // copy the D matrix
+    //       ABD[symind(irow,icol,9)] = D[symind(irow-3,icol-3,3)];
+    //     } else if ((irow == 6 && icol == 6) or (irow == 7 && icol == 7)) {
+    //       // copy the As transverse shear matrix
+    //       ABD[symind(irow,icol,9)] = As[irow-6];
+    //     } else if (irow == 8 && icol == 8) {
+    //       ABD[symind(irow,icol,9)] = drill;
+    //     }
+    //   }
+    // }
+
   } else {
     memset(ABD, 45 * sizeof(TacsScalar), 0.0);
   }

@@ -414,27 +414,6 @@ void TACSShellElement<quadrature, basis, director, model>::addResidual(
     A2D::ADObj<A2D::Mat<TacsScalar, 3, 3>> u0x_tmp, u1x_tmp1, u1x_tmp2, u1x_tmp3, u1x_term1, u1x_term2, u1x_sum; // temp variables
     A2D::ADObj<A2D::Mat<TacsScalar, 3, 3>> u0xi_frame, u1xi_frame, u0x, u1x;
 
-<<<<<<< HEAD
-    // Compute the set of strain components
-    TacsScalar e[9];  // The components of the strain
-    model::evalStrain(u0x, u1x, e0ty, e);
-    e[8] = et;
-    
-    // add thermal strain from prescribed temperature field
-    TacsScalar eth[9];
-    TacsScalar temp = temperature * 1.0;
-    con->evalThermalStrain(elemIndex, pt, X, temp, eth);
-
-    // Compute the mechanical strain (and stress)
-    TacsScalar em[9];
-    for (int i = 0; i < 9; i++) {
-      em[i] = e[i] - eth[i];
-    }
-
-    // Compute the corresponding stresses
-    TacsScalar s[9];
-    con->evalStress(elemIndex, pt, X, em, s);
-=======
     const A2D::MatOp NORMAL = A2D::MatOp::NORMAL, TRANSPOSE = A2D::MatOp::TRANSPOSE;
     const A2D::ShellStrainType STRAIN_TYPE = A2D::ShellStrainType::LINEAR; // if condition on type of model here..
 
@@ -469,7 +448,6 @@ void TACSShellElement<quadrature, basis, director, model>::addResidual(
       A2D::VecDot(E, S, ES_dot),
       A2D::Eval(0.5 * weight * detXd * ES_dot, Uelem)
     );
->>>>>>> 4123a39f459e342f4f1a8a3eb989e52665501780
 
     // reverse mode AD for the strain energy stack
     // -------------------------------------------------
@@ -640,6 +618,25 @@ void TACSShellElement<quadrature, basis, director, model>::addJacobian(
     // too hard to interpolate since different # of tying points for each gij entry
     basis::interpTyingStrain(pt, ety, gty.value().get_data());
 
+    // debug print out intermediate states for interpolations up to this point
+    // printf("et = %.8e\n", et.value().get_data()[0]);
+    // for (int i = 0; i < 3; i++) {
+    //   printf("X[%d] = %.8e\n", i, X.get_data()[i]);
+    //   printf("n0[%d] = %.8e\n", i, n0.get_data()[i]);
+    // }
+    // for (int j = 0; j < 6; j++) {
+    //   printf("Xxi[%d] = %.8e\n", j, Xxi.get_data()[j]);
+    //   printf("gty[%d] = %.8e\n", j, gty.value().get_data()[j]);
+    // }
+    // for (int i = 0; i < 3; i++) {
+    //   printf("d0[%d] = %.8e\n", i, d0.value().get_data()[i]);
+    // }
+    // for (int j = 0; j < 6; j++) {
+    //   printf("nxi[%d] = %.8e\n", j, nxi.get_data()[j]);
+    //   printf("d0xi[%d] = %.8e\n", j, d0xi.value().get_data()[j]);
+    //   printf("u0xi[%d] = %.8e\n", j, u0xi.value().get_data()[j]);
+    // }
+
     // setup before A2D strain energy stack
     // ------------------------------------
 
@@ -647,7 +644,8 @@ void TACSShellElement<quadrature, basis, director, model>::addJacobian(
     transform->computeTransform(Xxi.get_data(), n0.get_data(), T.get_data()); 
 
     // compute ABD matrix from shell theory (prospective)
-    A2D::SymMat<TacsScalar,9> ABD; // normally ABD is 6x6, but this one includes transverse shear and drill strains
+    // A2D::SymMat<TacsScalar,9> ABD; // normally ABD is 6x6, but this one includes transverse shear and drill strains
+    A2D::Mat<TacsScalar,9,9> ABD; // A2D doesn't handle mixed symmat * vec well right now..
     con->getABDmatrix(0, pt, X.get_data(), ABD.get_data()); // TODO make this routine
 
     // passive variables for strain energy stack
@@ -679,6 +677,14 @@ void TACSShellElement<quadrature, basis, director, model>::addJacobian(
     ); // auto evaluates on runtime
     // want this to not be included in Hessian/gradient backprop
 
+    // printf("detXd = %.8e\n", detXd.value());
+    // for (int i = 0; i < 9; i++) {
+    //   printf("Xd[%d] = %.8e\n", i, Xd.value().get_data()[i]);
+    //   printf("Xdz[%d] = %.8e\n", i, Xdz.value().get_data()[i]);
+    //   printf("Xdinv[%d] = %.8e\n", i, Xdinv.value().get_data()[i]);
+    //   printf("XdinvT[%d] = %.8e\n", i, XdinvT.value().get_data()[i]);     
+    // }
+
     // compute the strain energy from d0, d0xi, u0xi
     auto strain_energy_stack = A2D::MakeStack(
       // part 1 - compute shell basis and transform matrices (passive portion)
@@ -697,14 +703,31 @@ void TACSShellElement<quadrature, basis, director, model>::addJacobian(
       A2D::MatSum(1.0, u1x_term1, -1.0, u1x_term2, u1x_sum), // for some reason this entry has no hzero?
       A2D::MatRotateFrame(T, u1x_sum, u1x),
       // part 4 - compute transformed tying strain e0ty
-      A2D::MatRotateFrame(XdinvT, gty, e0ty),
+      A2D::SymMatRotateFrame(XdinvT, gty, e0ty),
       // part 5 - compute strains, stresses and then strain energy
       A2D::ShellStrain<STRAIN_TYPE>(u0x, u1x, e0ty, et, E),
-      A2D::MatMatMult(ABD, E, S),
+      A2D::MatVecMult(ABD, E, S),
       // part 6 - compute strain energy
       A2D::VecDot(E, S, ES_dot),
       A2D::Eval(0.5 * weight * detXd * ES_dot, Uelem)
     );
+
+    for (int j = 0; j < 6; j++) {
+      printf("e0ty[%d] = %.8e\n", j, e0ty.value().get_data()[j]);
+    }
+    for (int i = 0; i < 9; i++) {
+      printf("u0x[%d] = %.8e\n", i, u0x.value().get_data()[i]);
+      printf("u1x[%d] = %.8e\n", i, u1x.value().get_data()[i]);
+      printf("E[%d] = %.8e\n", i, E.value().get_data()[i]);
+      printf("S[%d] = %.8e\n", i, S.value().get_data()[i]);
+    }
+    printf("Uelem = %.8e\n", Uelem.value());
+    // for (int i = 0; i < 9; i++) {
+    //   printf("Xd[%d] = %.8e\n", i, Xd.value().get_data()[i]);
+    //   printf("Xdz[%d] = %.8e\n", i, Xdz.value().get_data()[i]);
+    //   printf("Xdinv[%d] = %.8e\n", i, Xdinv.value().get_data()[i]);
+    //   printf("XdinvT[%d] = %.8e\n", i, XdinvT.value().get_data()[i]);     
+    // }
 
     // printf("Post strain energy stack defn\n");
 

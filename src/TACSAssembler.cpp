@@ -4140,6 +4140,12 @@ void TACSAssembler::assembleJacobian(TacsScalar alpha, TacsScalar beta,
       // Get the number of variables from the element
       int nvars = elements[i]->getNumVariables();
 
+      // debug set vars to nonzero
+      for (int i1 = 0; i1 < 24; i1++) {
+        vars[i1] = static_cast<float>(rand()) / static_cast<float>(RAND_MAX);
+        printf("vars[%d] = %.8e\n", i1, vars[i1]);
+      }
+
       // Compute and add the contributions to the Jacobian
       memset(elemRes, 0, nvars * sizeof(TacsScalar));
       memset(elemMat, 0, nvars * nvars * sizeof(TacsScalar));

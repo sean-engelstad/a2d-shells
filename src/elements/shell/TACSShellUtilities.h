@@ -389,6 +389,14 @@ TacsScalar TacsShellComputeDispGrad(const double pt[], const TacsScalar Xpts[],
   // Compute XdinvT = Xdinv*T
   mat3x3MatMult(Xdinv, T, XdinvT);
 
+  // printf("detXd = %.8e\n", detXd);
+  // for (int i = 0; i < 9; i++) {
+  //   printf("Xd[%d] = %.8e\n", i, Xd[i]);
+  //   printf("Xdz[%d] = %.8e\n", i, Xdz[i]);
+  //   printf("Xdinv[%d] = %.8e\n", i, Xdinv[i]);
+  //   printf("XdinvT[%d] = %.8e\n", i, XdinvT[i]);     
+  // }
+
   // Compute Xdinvz = -Xdinv*Xdz*Xdinv*T
   mat3x3MatMult(negXdinvXdz, XdinvT, XdinvzT);
 
@@ -401,6 +409,15 @@ TacsScalar TacsShellComputeDispGrad(const double pt[], const TacsScalar Xpts[],
   // Compute the gradient of the displacement solution at the quadrature points
   TacsScalar u0xi[6];
   basis::template interpFieldsGrad<vars_per_node, 3>(pt, vars, u0xi);
+
+  // for (int i = 0; i < 3; i++) {
+  //   printf("d0[%d] = %.8e\n", i, d0[i]);
+  // }
+  // for (int j = 0; j < 6; j++) {
+  //   printf("nxi[%d] = %.8e\n", j, nxi[j]);
+  //   printf("d0xi[%d] = %.8e\n", j, d0xi[j]);
+  //    printf("u0xi[%d] = %.8e\n", j, u0xi[j]);
+  // }
 
   // Compute the derivative u0,x
   TacsShellAssembleFrame(u0xi, d0, u0x);  // Use u0x to store [u0,xi; d0]

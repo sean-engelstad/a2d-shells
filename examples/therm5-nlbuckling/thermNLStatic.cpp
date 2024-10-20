@@ -506,14 +506,14 @@ int main(int argc, char *argv[]) {
             // prev was using sigma = 1.0 guess
             //     tried changing to 0.0 in order to capture pos and negative eigenvalues better (but then doesn't solver initially)
             // then try using sigma = 0.0 only when near buckling?
-            if (iarclength == num_arclength_per_lbuckle) {
-                sigma = 1.0; // first time
-            } else {
-                if (eigval < 2.0) {
-                    sigma = 0.01;
-                }
-            }
-            buckling->setSigma(sigma);
+            // if (iarclength == num_arclength_per_lbuckle) {
+            //     sigma = 1.0; // first time
+            // } else {
+            //     if (eigval < 2.0) {
+            //         sigma = 0.01;
+            //     }
+            // }
+            buckling->setSigma(1.0);
             // option 1 - finds K_t(u) + lambda * |du| * d/ds K_t(u + s * du / |du|) 
             //     but then if |du| is much smaller than |u|, the lambda does not predict multiples on original lambda correctly
             buckling->solve_local(NULL, vars, ksm_print_buckling, delta_vars);
@@ -537,10 +537,10 @@ int main(int argc, char *argv[]) {
             //     then easier to determine predicted final lambda for final buckling..
             // buckling->solve(NULL, vars, ksm_print_buckling, NULL); // this one gives G(u,u)
             eigval = buckling->extractEigenvalue(0, &loc_error);
-            if (TacsRealPart(eigval) < TacsRealPart(min_NL_eigval)) {
-                nonlinear_eigval = lambda;
-                break; // break out of the arc length loop and we are done with nonlinear buckling!
-            }
+            // if (TacsRealPart(eigval) < TacsRealPart(min_NL_eigval)) {
+            //     nonlinear_eigval = lambda;
+            //     break; // break out of the arc length loop and we are done with nonlinear buckling!
+            // }
 
         }
 
@@ -556,6 +556,14 @@ int main(int argc, char *argv[]) {
         std::string filename = "_buckling/mech-nlbuckle" + std::to_string(iarclength) + ".f5";
         const char *cstr_filename = filename.c_str();
         f5->writeToFile(cstr_filename);
+
+        if (iarclength % num_arclength_per_lbuckle == 0 && iarclength != 0) {
+            printf("eigval = %.8e, min_NL_eigval = %.5e\n", eigval, min_NL_eigval);
+            if (TacsRealPart(eigval) < TacsRealPart(min_NL_eigval) || TacsRealPart(loc_error) > 1e-4) {
+                nonlinear_eigval = lambda;
+                break; // break out of the arc length loop and we are done with nonlinear buckling!
+            }
+        }
 
     } // end of outer arc length steps for loop
 

@@ -10,13 +10,11 @@ void getNonlinearBucklingKDF(MPI_Comm comm, int run, double rt, double Lr = 2.0,
 
     double t = 0.002; // m 
     // double Lr = 2.0; // default 2.0
-    // double rt = 500; // 100, 50, 25
+    // double rt = 100; // 100, 50, 25
     double R = t * rt; // m
     double L = R * Lr;
 
-    // need a better way to predict the disp based on closed-form solutions of linear buckling
-    // double udisp = -1e-5; // compressive udisp (for r/t = 100)
-    double udisp = -1e-5; // ( for r/t = 25 )to be most accurate want udisp about 1/200 to 1/300 the linear buckling disp
+    double udisp = 0.0; // no compressive disp (compressive strain from heating only)
 
     // select nelems and it will select to retain isotropic elements (good element AR)
     // want dy = 2 * pi * R / ny the hoop elem spacing to be equal dx = L / nx the axial elem spacing
@@ -32,11 +30,10 @@ void getNonlinearBucklingKDF(MPI_Comm comm, int run, double rt, double Lr = 2.0,
 
     TacsScalar rho = 2700.0;
     TacsScalar specific_heat = 921.096;
-    TacsScalar E = 70e3; // 70e9 (lower value of E helps solve more accurately, doesn't affect buckling loads with disp control)
-    // it just affects scale of energy and numerical issues in the SEP solver (so better to have lower E here)
+    TacsScalar E = 70e9;
     TacsScalar nu = 0.3;
     TacsScalar ys = 270.0;
-    TacsScalar cte = 24.0e-6;
+    TacsScalar cte = 10.0e-6;
     TacsScalar kappa = 230.0;
     TACSMaterialProperties *props = new TACSMaterialProperties(rho, specific_heat, E, nu, ys, cte, kappa);
 
@@ -53,9 +50,16 @@ void getNonlinearBucklingKDF(MPI_Comm comm, int run, double rt, double Lr = 2.0,
     shell->incref();
     createAssembler(comm, order, nx, ny, udisp, L, R, shell, &assembler, &creator);
 
-    // Solve the linear static analysis
-    if (rank == 0) {
-        printf("Solving linear system..\n");
+    // set the temperatures into the structure
+    TacsScalar temperature = 1.0; // default 1.0 // 1 deg K
+    int numElements = assembler->getNumElements();
+    TACSQuad4NonlinearShell *elem;
+    for (int ielem = 0; ielem < numElements; ielem++) {
+        elem = dynamic_cast<TACSQuad4NonlinearShell *>(assembler->getElement(ielem));
+        elem->setTemperature(temperature);
+        #ifdef TACS_USE_COMPLEX
+            elem->setComplexStepGmatrix(true);
+        #endif
     }
     
     // Create the design vector
@@ -138,8 +142,9 @@ void getNonlinearBucklingKDF(MPI_Comm comm, int run, double rt, double Lr = 2.0,
     // exit(0);
 
     // choose imperfection sizes for the cylinder based on the cylinder thickness
-    // TacsScalar imperfection_sizes[3] = {0.5 * t, 0.1 * t, 0.05 * t}; // t is cylinder thickness here
-    TacsScalar imperfection_sizes[3] = {0.5 * t, 0.0, 0.0};
+    // TacsScalar imperfection_sizes[3] = {0.5 * t, 0.0, 0.0}; // t is cylinder thickness here
+    TacsScalar imperfection_sizes[3] = {0.3 * t, 0.1 * t, 0.1 * t}; // t is cylinder thickness here
+    // TacsScalar imperfection_sizes[3] = {0.5 / 3.0 * t, 0.5 / 3.0 * t, 0.5 / 3.0 * t};
 
     // apply the first few eigenmodes as geometric imperfections to the cylinder
     TACSBVec *phi = assembler->createVec();
@@ -204,12 +209,10 @@ void getNonlinearBucklingKDF(MPI_Comm comm, int run, double rt, double Lr = 2.0,
     // begin writing out to output file
     FILE *fp;
     if (rank == 0) {
-        std::string file1 = "_runs/nl_buckling" + std::to_string(run) + ".out";
-        const char *cstr_file1 = file1.c_str();
-        fp = fopen(cstr_file1, "w");
+        fp = fopen("nl_buckling.out", "w");
 
         if (fp) {
-            fprintf(fp, "$ Nonlinear mechanical buckling of cylinder : t = %10.3e, r/t = %10.3e, L/r = %10.3e, nelems=%d\n", t, rt, Lr, nelems);
+            fprintf(fp, "$ Nonlinear mechanical buckling of cylinder : t = %15.6e, r/t = %15.6e, L/r = %15.6e\n", t, rt, Lr);
             fprintf(fp, "iter, lambda,         |u|/lambda,     dlambda_ds,     loc_eigval,     error,          LIN_buckle,     pred_NL_buckle\n");
             fflush(fp);
         }
@@ -231,7 +234,7 @@ void getNonlinearBucklingKDF(MPI_Comm comm, int run, double rt, double Lr = 2.0,
 
     // nonlinear static important input settings
     // ------------------------------------------------------------
-    double lambda_init = 280.0 * 0.05;
+    double lambda_init = 181.0 * 0.05;
     double target_delta_lambda = 5.0;
     int max_continuation_iters = 300; // default 300 // for prelim Newton solve to lambda_init
     int max_correction_iters = 100; // for the arc length method static regime
@@ -244,7 +247,7 @@ void getNonlinearBucklingKDF(MPI_Comm comm, int run, double rt, double Lr = 2.0,
     double tangent_rtol = 1e-6; // for prelim newton solve section
     double tangent_atol = 1e-10;
     int num_arclength_per_lbuckle = 10; // 5 is default // num arc length steps for each linear buckling check
-    double min_NL_eigval = 0.5; // default is 1.0 or 0.5
+    double min_NL_eigval = 0.01; // default is 1.0 or 0.5
     // for some reason SEP solver can't drive eigenvalue below zero with shift and invert (needs work)
     bool hit_buckling = false;
     TacsScalar nonlinear_eigval;
@@ -266,6 +269,7 @@ void getNonlinearBucklingKDF(MPI_Comm comm, int run, double rt, double Lr = 2.0,
     TACSBVec *tangent = assembler->createVec();
     TACSBVec *update = assembler->createVec();
     TACSBVec *res = assembler->createVec();
+    TACSBVec *dres_dT = assembler->createVec();
 
     TACSContinuationPathMat *path_mat = new TACSContinuationPathMat(kmat, f, tangent, 0.0);
     path_mat->incref();
@@ -286,6 +290,7 @@ void getNonlinearBucklingKDF(MPI_Comm comm, int run, double rt, double Lr = 2.0,
     // -----------------------------------------------------------
 
     // Compute and factor the tangent stiffness matrix
+    assembler->setTemperatures(lambda * temperature);
     assembler->assembleJacobian(1.0, 0.0, 0.0, res, kmat, TACS_MAT_NORMAL, 1.0, lambda);
     pc->factor();
     gmres->setTolerances(tangent_rtol, tangent_atol);
@@ -297,6 +302,7 @@ void getNonlinearBucklingKDF(MPI_Comm comm, int run, double rt, double Lr = 2.0,
     // Newton solve until convergence to (u0, lambda0)
     for (int k = 0; k < max_continuation_iters; k++) {
         // update the nonlinear residaul
+        assembler->setTemperatures(lambda * temperature); // may be unnecessary here since sets to same value
         assembler->setVariables(vars);
         assembler->assembleRes(res, 1.0, lambda); // lambda input here scales the disp control BCs with load factor too
         res->axpy(-lambda, f); // add in load control effects
@@ -335,6 +341,7 @@ void getNonlinearBucklingKDF(MPI_Comm comm, int run, double rt, double Lr = 2.0,
     TacsScalar dlambda_ds = 0.0; 
     for (int iarclength = 0; !hit_buckling && iarclength < max_continuation_iters; iarclength++) {
         // new arclength step => update the residual, etc.
+        assembler->setTemperatures(lambda * temperature);
         assembler->setVariables(vars);
         assembler->assembleJacobian(1.0, 0.0, 0.0, res, kmat, TACS_MAT_NORMAL, 1.0, lambda);
         res->axpy(-lambda, f); // add in load control effects
@@ -344,6 +351,10 @@ void getNonlinearBucklingKDF(MPI_Comm comm, int run, double rt, double Lr = 2.0,
 
         // adjustments to lambda step for next arclength step
         if (iarclength == 0) {
+            // finite difference on dres/dT (change in residual with temp load factor)
+            // res->
+            // dres_dT = ?
+
             gmres->setOperators(kmat, pc);
             gmres->solve(f, tangent);
             // TODO : need to fix this for disp control
@@ -391,6 +402,7 @@ void getNonlinearBucklingKDF(MPI_Comm comm, int run, double rt, double Lr = 2.0,
         // Now compute the next iteration
         TacsScalar init_res_norm = 0.0;
         for (int j = 0; j < max_correction_iters; j++) {
+            assembler->setTemperatures(lambda * temperature);
             assembler->setVariables(vars);
             assembler->assembleRes(res, 1.0, lambda);
             res->axpy(-lambda, f);
@@ -479,7 +491,7 @@ void getNonlinearBucklingKDF(MPI_Comm comm, int run, double rt, double Lr = 2.0,
             // if (iarclength == num_arclength_per_lbuckle) {
             //     sigma = 1.0; // first time
             // } else {
-            //     if (TacsRealPart(eigval) < 2.0 * min_NL_eigval) {
+            //     if (eigval < 2.0) {
             //         sigma = 0.01;
             //     }
             // }
@@ -487,20 +499,6 @@ void getNonlinearBucklingKDF(MPI_Comm comm, int run, double rt, double Lr = 2.0,
             // option 1 - finds K_t(u) + lambda * |du| * d/ds K_t(u + s * du / |du|) 
             //     but then if |du| is much smaller than |u|, the lambda does not predict multiples on original lambda correctly
             buckling->solve_local(NULL, vars, ksm_print_buckling, delta_vars);
-
-            // option 2 - finds K_t(u) + lambda * |u| * d/ds K_t(u + s * u / |u|)
-            //     then easier to determine predicted final lambda for final buckling..
-            // buckling->solve(NULL, vars, ksm_print_buckling, NULL); // this one gives G(u,u)
-            eigval = buckling->extractEigenvalue(0, &loc_error);
-            // if (TacsRealPart(eigval) < TacsRealPart(min_NL_eigval)) {
-            //     nonlinear_eigval = lambda;
-            //     break; // break out of the arc length loop and we are done with nonlinear buckling!
-            // }
-
-            if (eigval < 2.0 * min_NL_eigval) {
-                // now set more rapid buckling checking near the final eigenvalue
-                num_arclength_per_lbuckle = 3;
-            }
 
             // would also really like to write out the linear eigenvalues and |u|, etc. to a custom buckling .out file
             // so we can monitor the progress as it moves towards nonlinear buckling
@@ -516,6 +514,15 @@ void getNonlinearBucklingKDF(MPI_Comm comm, int run, double rt, double Lr = 2.0,
                     TacsRealPart(pred_lambda_NL));
                 fflush(fp);
             }
+
+            // option 2 - finds K_t(u) + lambda * |u| * d/ds K_t(u + s * u / |u|)
+            //     then easier to determine predicted final lambda for final buckling..
+            // buckling->solve(NULL, vars, ksm_print_buckling, NULL); // this one gives G(u,u)
+            eigval = buckling->extractEigenvalue(0, &loc_error);
+            // if (TacsRealPart(eigval) < TacsRealPart(min_NL_eigval)) {
+            //     nonlinear_eigval = lambda;
+            //     break; // break out of the arc length loop and we are done with nonlinear buckling!
+            // }
 
         }
 

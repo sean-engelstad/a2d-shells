@@ -318,13 +318,13 @@ void TACSLinearBuckling::solve_local(TACSVec *rhs, TACSVec *u0, KSMPrint *ksm_pr
   if (du) {
     if (u0) {
       vars->copyValues(u0);
-      assembler->setBCs(vars);
+      // assembler->setBCs(vars); // don't think this is right (need load factor input?)
       assembler->setVariables(vars);
     } else {
       exit(0);
     }
   } else {
-    assembler->setBCs(path);
+    assembler->setBCs(path); // NOTE : don't think this is right when load factor > 1 either
     assembler->setVariables(path);
   }
 
@@ -334,9 +334,10 @@ void TACSLinearBuckling::solve_local(TACSVec *rhs, TACSVec *u0, KSMPrint *ksm_pr
   aux_mat->copyValues(kmat);
 
   // Assemble the stiffness and geometric stiffness matrix
+  // assembler->setVariables(path);
   // assembler->assembleMatType(TACS_GEOMETRIC_STIFFNESS_MATRIX, gmat);
+
   assembler->assembleNonlinearGmat(TACS_GEOMETRIC_STIFFNESS_MATRIX, gmat, TACS_MAT_NORMAL, 1.0, path);
-  // assembler->assembleMatType(TACS_GEOMETRIC_STIFFNESS_MATRIX, gmat, TACS_MAT_NORMAL, 1.0, path);
 
   // Form the shifted operator and factor it
   aux_mat->axpy(sigma, gmat);

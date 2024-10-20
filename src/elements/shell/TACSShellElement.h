@@ -730,11 +730,18 @@ void TACSShellElement<quadrature, basis, director, model>::getMatType(
     // include thermal path in norm
     norm += temp_orig * temp_orig;
 
+    
     if (TacsRealPart(norm) == 0.0) {
       norm = 1.0;
+      // printf("norm = %.8e\n", norm);
     } else {
       norm = sqrt(norm);
+      // printf("norm = %.8e\n", norm);
+      for (int i = 0; i < 24; i++) {
+        // printf("delta_vars[%d] = %.8e\n", i, delta_vars[i]);
+      }
     }
+    // printf("norm = %.8e\n", norm);
 
     // Central difference the tangent stiffness matrix
     alpha = 0.5 * norm / dh_mag;
@@ -766,7 +773,7 @@ void TACSShellElement<quadrature, basis, director, model>::getMatType(
 
     // bwd step
     for (int i = 0; i < vars_per_node * num_nodes; i++) {
-      path[i] = -dh * vars[i] / norm;
+      path[i] = -dh * delta_vars[i] / norm;
     }
 
     // temperature perturbation as well (for thermal buckling)

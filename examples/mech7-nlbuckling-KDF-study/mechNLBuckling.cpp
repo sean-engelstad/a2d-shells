@@ -24,15 +24,16 @@ int main(int argc, char *argv[]) {
     // Get the rank
     MPI_Comm comm = MPI_COMM_WORLD;
 
-    double rtVals[7] = {1000.0, 500.0, 300.0, 100.0, 50.0, 25.0, 10.0};
-    int meshSizes[7] = {40000, 20000, 10000, 10000, 10000, 10000, 10000};
+    const int NRUNS = 7;
+    double rtVals[NRUNS] = {1000.0, 500.0, 300.0, 100.0, 50.0, 25.0, 10.0};
+    int meshSizes[NRUNS] = {40000, 20000, 10000, 10000, 10000, 10000, 10000};
     
     // run each KDF simulation for mechanical nonlinear buckling
-    for (int irun = 0; irun < 7; irun++) {
+    for (int irun = NRUNS-1; irun >= 0; irun--) {
         double rt = rtVals[irun];
         double Lr = 2.0;
         int nelems = meshSizes[irun]; // 5000, 10000
-        getNonlinearBucklingKDF(comm, irun+1, rt, 2.0, nelems);
+        getNonlinearBucklingKDF(comm, irun+1, rt, Lr, nelems);
     }   
 
     MPI_Finalize();

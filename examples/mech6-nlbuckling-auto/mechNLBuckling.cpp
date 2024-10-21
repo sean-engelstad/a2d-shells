@@ -20,10 +20,11 @@ int main(int argc, char *argv[]) {
     TacsScalar imperfections[NUM_IMP] = {0.5 * t, 0.0, 0.0 };
     bool useEigvals = true;
     int nelems = 10000;
+    std::string filePrefix = "";
     TacsScalar nasaKDF, tacsKDF;
 
     getNonlinearBucklingKDF(
-        comm, 1, t, rt, Lr, NUM_IMP, &imperfections[0],
+        comm, 1, filePrefix, t, rt, Lr, NUM_IMP, &imperfections[0],
         useEigvals, nelems, &nasaKDF, &tacsKDF
     );
 

@@ -14,16 +14,27 @@ int main(int argc, char *argv[]) {
     const int NRUNS = 7;
     double rtVals[NRUNS] = {1000.0, 500.0, 300.0, 100.0, 50.0, 25.0, 10.0};
     int meshSizes[NRUNS] = {40000, 20000, 10000, 10000, 10000, 10000, 10000};
-    TacsScalar nasaKDF[NRUNS] = 0.0;
-    TacsScalar tacsKDF[NRUNS] = 0.0;
+    TacsScalar nasaKDF[NRUNS] = { };
+    TacsScalar tacsKDF[NRUNS] = { };
 
     double t = 0.002;
     double Lr = 2.0;
     const int NUM_IMP = 3;
+    std::string filePrefix = "_runs/";
     // for debugging
     // TacsScalar imperfections[NUM_IMP] = {0.0 * t, 0.0, 0.0 };
     TacsScalar imperfections[NUM_IMP] = {0.5 * t, 0.0, 0.0 };
-    bool useEigvals = true;
+    bool useEigvals = true; // if false uses load-disp curve
+
+    FILE *fp;
+    if (rank == 0) {
+        fp = fopen("kdfs.csv", "w");
+        if (fp) {
+            fprintf(fp, "KDFs of cylinder with 0.5 * t mode 1 imperfection, t = %10.3e, L/r = %10.3e\n", t, Lr);
+            fprintf(fp, "nelems, r/t, nasaKDF, tacsKDF\n");
+            fflush(fp);
+        }
+    }
     
 
     // run each KDF simulation for mechanical nonlinear buckling
@@ -31,9 +42,15 @@ int main(int argc, char *argv[]) {
         double rt = rtVals[irun];
         int nelems = meshSizes[irun]; // 5000, 10000
         getNonlinearBucklingKDF(
-            comm, 1, t, rt, Lr, NUM_IMP, &imperfections[0],
+            comm, 1, filePrefix, t, rt, Lr, NUM_IMP, &imperfections[0],
             useEigvals, nelems, &nasaKDF[irun], &tacsKDF[irun]
         );
+
+        // writeout KDFs to csv file
+        if (fp) {
+            fprintf(fp, "%10.5e, %10.5e, %10.5e, %10.5e\n", nelems, rt, TacsRealPart(nasaKDF[irun]), TacsRealPart(tacsKDF[irun]));
+            fflush(fp);
+        }
     }   
 
     MPI_Finalize();

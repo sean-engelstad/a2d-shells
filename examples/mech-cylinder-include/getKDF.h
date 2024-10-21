@@ -9,6 +9,7 @@
 #include "TACSContinuation.h"
 
 void getNonlinearBucklingKDF(MPI_Comm comm, int run, 
+    std::string filePrefix,
     double t, double rt, double Lr, 
     int num_imperfections, TacsScalar *imperfection_sizes,
     bool useEigvals,
@@ -213,7 +214,7 @@ void getNonlinearBucklingKDF(MPI_Comm comm, int run,
     // begin writing out to output file
     FILE *fp;
     if (rank == 0) {
-        std::string file1 = "_runs/nl_buckling" + std::to_string(run) + ".out";
+        std::string file1 = filePrefix + "nl_buckling" + std::to_string(run) + ".out";
         const char *cstr_file1 = file1.c_str();
         fp = fopen(cstr_file1, "w");
 
@@ -227,7 +228,7 @@ void getNonlinearBucklingKDF(MPI_Comm comm, int run,
     // write another file for plotting load-displacement curve
     FILE *fp2;
     if (rank == 0) {
-        std::string file2 = "_runs/load-disp" + std::to_string(run) + ".csv";
+        std::string file2 = filePrefix + "load-disp" + std::to_string(run) + ".csv";
         const char *cstr_file2 = file2.c_str();
         fp2 = fopen(cstr_file2, "w");
         if (fp2) {
@@ -565,7 +566,7 @@ void getNonlinearBucklingKDF(MPI_Comm comm, int run,
     }
 
     // write final solution to f5
-    std::string file2 = "_runs/nl_buckling" + std::to_string(run) + ".f5";
+    std::string file2 = filePrefix + "nl_buckling" + std::to_string(run) + ".f5";
     const char *cstr_file2 = file2.c_str();
     fp = fopen(cstr_file2, "w");
     f5->writeToFile(cstr_file2);

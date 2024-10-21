@@ -28,5 +28,6 @@ clean:
 	rm -f *.x
 
 cleanf5:
+	rm *.csv
 	rm -f **/*.f5
 	rm -f **/*.vtk

@@ -244,7 +244,7 @@ void getNonlinearBucklingKDF(MPI_Comm comm, int run, double rt, double Lr = 2.0,
     double tangent_rtol = 1e-6; // for prelim newton solve section
     double tangent_atol = 1e-10;
     int num_arclength_per_lbuckle = 10; // 5 is default // num arc length steps for each linear buckling check
-    double min_NL_eigval = 0.5; // default is 1.0 or 0.5
+    double min_NL_eigval = 3.0; // default is 1.0 or 0.5
     // for some reason SEP solver can't drive eigenvalue below zero with shift and invert (needs work)
     bool hit_buckling = false;
     TacsScalar nonlinear_eigval;
@@ -497,7 +497,7 @@ void getNonlinearBucklingKDF(MPI_Comm comm, int run, double rt, double Lr = 2.0,
             //     break; // break out of the arc length loop and we are done with nonlinear buckling!
             // }
 
-            if (eigval < 2.0 * min_NL_eigval) {
+            if (eigval < 20.0) {
                 // now set more rapid buckling checking near the final eigenvalue
                 num_arclength_per_lbuckle = 3;
             }
@@ -534,7 +534,7 @@ void getNonlinearBucklingKDF(MPI_Comm comm, int run, double rt, double Lr = 2.0,
 
         if (iarclength % num_arclength_per_lbuckle == 0 && iarclength != 0) {
             printf("eigval = %.8e, min_NL_eigval = %.5e\n", eigval, min_NL_eigval);
-            if (TacsRealPart(eigval) < TacsRealPart(min_NL_eigval) || TacsRealPart(loc_error) > 1e-4) {
+            if (TacsRealPart(eigval) < 4.0 || TacsRealPart(loc_error) > 1e-1) {
                 nonlinear_eigval = lambda;
                 break; // break out of the arc length loop and we are done with nonlinear buckling!
             }

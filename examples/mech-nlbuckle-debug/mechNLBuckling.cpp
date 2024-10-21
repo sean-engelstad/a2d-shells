@@ -287,7 +287,7 @@ int main(int argc, char *argv[]) {
     double tangent_rtol = 1e-6; // for prelim newton solve section
     double tangent_atol = 1e-10;
     int num_arclength_per_lbuckle = 10; // 5 is default // num arc length steps for each linear buckling check
-    double min_NL_eigval = 0.05; // default is 1.0 or 0.5, then tried 0.01
+    double min_NL_eigval = 4.0; // default is 1.0 or 0.5, then tried 0.01
     // for some reason SEP solver can't drive eigenvalue below zero with shift and invert (needs work)
     bool hit_buckling = false;
     TacsScalar nonlinear_eigval;

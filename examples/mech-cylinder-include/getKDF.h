@@ -110,6 +110,13 @@ void getNonlinearBucklingKDF(MPI_Comm comm, int run,
     KSMPrint *ksm_print = new KSMPrintStdout("NonlinearStatic", 0, 10);
     ksm_print->incref();
 
+    // Create an TACSToFH5 object for writing output to files
+    int write_flag = (TACS_OUTPUT_CONNECTIVITY | TACS_OUTPUT_NODES |
+                        TACS_OUTPUT_DISPLACEMENTS | TACS_OUTPUT_STRAINS |
+                        TACS_OUTPUT_STRESSES | TACS_OUTPUT_EXTRAS);
+    TACSToFH5 *f5 = new TACSToFH5(assembler, TACS_BEAM_OR_SHELL_ELEMENT, write_flag);
+    f5->incref();
+
     // build the TACS linear buckling analysis object
     // which we will use to check for buckling in the nonlinear load-displacement curve (u,lambda)
     // also use the linear eigenmodes as geometric imperfections in the cylinder
@@ -147,12 +154,24 @@ void getNonlinearBucklingKDF(MPI_Comm comm, int run,
     // solve the buckling analysis
     buckling->setSigma(10.0);
     buckling->solve(NULL, NULL, ksm_print_buckling);
+    
+    // write principal eigenmode
+    std::string fileL = filePrefix + "lin_buckle" + std::to_string(run) + ".f5";
+    const char *cstr_fileL = fileL.c_str();
+    TACSBVec *phi = assembler->createVec();
+    phi->incref();
+    TacsScalar error1;
+    buckling->extractEigenvector(0, phi, &error1);
+    assembler->setVariables(phi); 
+    f5->writeToFile(cstr_fileL);
+    // reset setVars
+    assembler->zeroVariables();
     // exit(0);
 
     // choose imperfection sizes for the cylinder based on the cylinder thickness
 
     // apply the first few eigenmodes as geometric imperfections to the cylinder
-    TACSBVec *phi = assembler->createVec();
+    // TACSBVec *phi = assembler->createVec();
     TACSBVec *xpts = assembler->createNodeVec();
     TACSBVec *phi_uvw = assembler->createNodeVec();
     assembler->getNodes(xpts);
@@ -163,9 +182,6 @@ void getNonlinearBucklingKDF(MPI_Comm comm, int run,
     TacsScalar linear_eigval = buckling->extractEigenvalue(0, &error);
     for (int imode = 0; imode < num_imperfections; imode++) {
         buckling->extractEigenvector(imode, phi, &error);
-        // if (imode == 0) {
-        //     assembler->setVariables(phi);
-        // }
 
         // copy the phi for all 6 shell dof into phi_uvw
         // how to copy every 3 out of 6 values from 
@@ -179,9 +195,6 @@ void getNonlinearBucklingKDF(MPI_Comm comm, int run,
             if (idof > 2) { // skip rotx, roty, rotz components of eigenvector
                 continue;
             }
-            // printf("iphi %d, idof %d\n", iphi, idof);
-            // printf("phi_x at %d / %d\n", iphi, varSize);
-            // printf("phi_uvw_x at %d / %d\n", ixpts, nodeSize);
             phi_uvw_x[ixpts] = phi_x[iphi];
             ixpts++;
             TacsScalar abs_disp = abs(TacsRealPart(phi_x[iphi]));
@@ -262,13 +275,6 @@ void getNonlinearBucklingKDF(MPI_Comm comm, int run,
 
     // prelim build objects
     // ------------------------------------------------------------
-
-    // Create an TACSToFH5 object for writing output to files
-    int write_flag = (TACS_OUTPUT_CONNECTIVITY | TACS_OUTPUT_NODES |
-                        TACS_OUTPUT_DISPLACEMENTS | TACS_OUTPUT_STRAINS |
-                        TACS_OUTPUT_STRESSES | TACS_OUTPUT_EXTRAS);
-    TACSToFH5 *f5 = new TACSToFH5(assembler, TACS_BEAM_OR_SHELL_ELEMENT, write_flag);
-    f5->incref();
 
     TACSBVec *vars = assembler->createVec();
     TACSBVec *old_vars = assembler->createVec();
@@ -491,7 +497,6 @@ void getNonlinearBucklingKDF(MPI_Comm comm, int run,
                     TacsRealPart(pred_lambda_NL));
                 fflush(fp);
             }
-
         }
 
 
@@ -529,6 +534,7 @@ void getNonlinearBucklingKDF(MPI_Comm comm, int run,
         
 
         // write out file from this arc length step
+        assembler->setVariables(vars); // set orig values back in
         std::string filename = "_buckling/mech-nlbuckle" + std::to_string(iarclength) + ".f5";
         const char *cstr_filename = filename.c_str();
         f5->writeToFile(cstr_filename);
@@ -568,7 +574,6 @@ void getNonlinearBucklingKDF(MPI_Comm comm, int run,
     // write final solution to f5
     std::string file2 = filePrefix + "nl_buckling" + std::to_string(run) + ".f5";
     const char *cstr_file2 = file2.c_str();
-    fp = fopen(cstr_file2, "w");
     f5->writeToFile(cstr_file2);
     f5->decref();
 

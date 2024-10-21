@@ -76,6 +76,47 @@ class TACSElement : public TACSObject {
                                   const TacsScalar ddvars[],
                                   TacsScalar *avgStresses) {}
 
+
+  /**
+    Get max stresses in the element
+
+    @param elemIndex The element index for each element.
+    @param elem_type The type of element for this element group.
+    @param elemXpts The xyz coordinates of the elements.
+    @param vars The state variables for each element.
+    @param dvars The first time derivative of the state variables for each
+    element.
+    @param ddvars The second time derivative of the state variables for each
+    element
+    @return An array of the max stresses in the element.
+   */
+  virtual void getMaxStresses(int elemIndex, ElementType elem_type,
+                                  const TacsScalar elemXpts[],
+                                  const TacsScalar vars[],
+                                  const TacsScalar dvars[],
+                                  const TacsScalar ddvars[],
+                                  TacsScalar *maxStresses) {}
+
+  /**
+    Get min stresses in the element
+
+    @param elemIndex The element index for each element.
+    @param elem_type The type of element for this element group.
+    @param elemXpts The xyz coordinates of the elements.
+    @param vars The state variables for each element.
+    @param dvars The first time derivative of the state variables for each
+    element.
+    @param ddvars The second time derivative of the state variables for each
+    element
+    @return An array of the min stresses in the element.
+   */
+  virtual void getMinStresses(int elemIndex, ElementType elem_type,
+                                  const TacsScalar elemXpts[],
+                                  const TacsScalar vars[],
+                                  const TacsScalar dvars[],
+                                  const TacsScalar ddvars[],
+                                  TacsScalar *minStresses) {}
+
   /**
     Get a string representation of the element name
 

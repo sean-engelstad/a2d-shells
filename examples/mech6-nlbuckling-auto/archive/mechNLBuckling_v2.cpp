@@ -152,37 +152,11 @@ int main(int argc, char *argv[]) {
     // solve the buckling analysis
     buckling->setSigma(10.0);
     buckling->solve(NULL, NULL, ksm_print_buckling);
-
-    // // compare solve_local to solve here
-    // TACSBVec *ans = assembler->createVec();  // displacements and rotations
-    TACSBVec *res = assembler->createVec();  // The residual
-    // assembler->assembleJacobian(1.0, 0.0, 0.0, res, kmat);
-    // ans->incref(); res->incref();
-    // assembler->applyBCs(res);
-    // pc->factor(); pc->applyFactor(res, ans);
-    // ans->scale(-1.0);
-    // u0->zeroEntries();
-    // assembler->setBCs(ans);
-    // assembler->setVariables(ans);
-
-    // int write_flag = (TACS_OUTPUT_CONNECTIVITY | TACS_OUTPUT_NODES |
-    //                     TACS_OUTPUT_DISPLACEMENTS | TACS_OUTPUT_STRAINS |
-    //                     TACS_OUTPUT_STRESSES | TACS_OUTPUT_EXTRAS);
-    // ElementType etype = TACS_BEAM_OR_SHELL_ELEMENT;
-    // TACSToFH5 *f5 = new TACSToFH5(assembler, etype, write_flag);
-    // f5->incref();
-    // f5->writeToFile("cylinder_solution.f5");
-
-    // // assembler->setBCs(u0);
-    // assembler->setVariables(u0);
-    // buckling->solve_local(NULL, u0, ksm_print_buckling, ans);
-
     // exit(0);
 
     // choose imperfection sizes for the cylinder based on the cylinder thickness
     // TacsScalar imperfection_sizes[3] = {0.5 * t, 0.1 * t, 0.05 * t}; // t is cylinder thickness here
-    // TacsScalar imperfection_sizes[3] = {0.5 / 3.0 * t, 0.5 / 3.0 * t, 0.5 / 3.0 * t};
-    TacsScalar imperfection_sizes[3] = {0.0, 0.0, 0.0}; // solve on perfect geometry for debugging purposes
+    TacsScalar imperfection_sizes[3] = {0.5 / 3.0 * t, 0.5 / 3.0 * t, 0.5 / 3.0 * t};
 
     // apply the first few eigenmodes as geometric imperfections to the cylinder
     TACSBVec *phi = assembler->createVec();
@@ -194,9 +168,6 @@ int main(int argc, char *argv[]) {
     phi_uvw->incref();
     TacsScalar error;
     TacsScalar linear_eigval = buckling->extractEigenvalue(0, &error);
-    printf("linear eigval = %.8e\n", linear_eigval);
-    // exit(0);
-
     for (int imode = 0; imode < 3; imode++) {
         buckling->extractEigenvector(imode, phi, &error);
         // if (imode == 0) {
@@ -287,7 +258,7 @@ int main(int argc, char *argv[]) {
     double tangent_rtol = 1e-6; // for prelim newton solve section
     double tangent_atol = 1e-10;
     int num_arclength_per_lbuckle = 10; // 5 is default // num arc length steps for each linear buckling check
-    double min_NL_eigval = 4.0; // default is 1.0 or 0.5, then tried 0.01
+    double min_NL_eigval = 0.5; // default is 1.0 or 0.5
     // for some reason SEP solver can't drive eigenvalue below zero with shift and invert (needs work)
     bool hit_buckling = false;
     TacsScalar nonlinear_eigval;
@@ -295,7 +266,7 @@ int main(int argc, char *argv[]) {
     // prelim build objects
     // ------------------------------------------------------------
 
-    // // Create an TACSToFH5 object for writing output to files
+    // Create an TACSToFH5 object for writing output to files
     int write_flag = (TACS_OUTPUT_CONNECTIVITY | TACS_OUTPUT_NODES |
                         TACS_OUTPUT_DISPLACEMENTS | TACS_OUTPUT_STRAINS |
                         TACS_OUTPUT_STRESSES | TACS_OUTPUT_EXTRAS);
@@ -308,7 +279,7 @@ int main(int argc, char *argv[]) {
     TACSBVec *temp = assembler->createVec();
     TACSBVec *tangent = assembler->createVec();
     TACSBVec *update = assembler->createVec();
-    // TACSBVec *res = assembler->createVec();
+    TACSBVec *res = assembler->createVec();
 
     TACSContinuationPathMat *path_mat = new TACSContinuationPathMat(kmat, f, tangent, 0.0);
     path_mat->incref();
@@ -497,9 +468,21 @@ int main(int argc, char *argv[]) {
         // TODO : fix this to set lambda into the linear buckling problem and do linear static
         if (iarclength % num_arclength_per_lbuckle == 0 && iarclength != 0) {
             // debug
-            // not sure the setBCs is correct here (what about the load factor input)
-            // assembler->setBCs(vars);
-            // assembler->setBCs(old_vars);
+            assembler->setBCs(vars);
+            // assembler->setVariables(vars);
+            // f5->writeToFile("debug.f5");
+            // return 0;
+
+            // * previous TACS linear buckling computes G(u) = d/ds{ K_t(u + s * u / |u|) }
+            //   and then the eigenvalue problem [ K_t(u) + lambda * G(u) ] cdot phi = 0
+            // * however in this case with nonlinear buckling we are much further down the nonlinear load path
+            //   and would prefer to measure G(u,du) = d/ds{ K_t(u + s * du / |du|) }
+            //   where du = u(s+ds) - u(s) [really du equiv to delta u from last arc length step]
+            // * I changed the linear buckling analysis to compute assembleNonlinearGmat() a new
+            //   temp routine that does find G(u,du) in A2D-SHELLS.
+            // * Also would like to more adaptively predict (maybe linearization of linear principal eigenvalues lambda_LIN(s) = 0)
+            //   to sample a bit more frequently near buckling
+            assembler->setBCs(old_vars);
             delta_vars->copyValues(vars);
             delta_vars->axpy(-1.0, old_vars); // delta_u(s) = u(s+ds) - u(s) [change in vars along load path for two equilib points]
 
@@ -507,14 +490,14 @@ int main(int argc, char *argv[]) {
             // prev was using sigma = 1.0 guess
             //     tried changing to 0.0 in order to capture pos and negative eigenvalues better (but then doesn't solver initially)
             // then try using sigma = 0.0 only when near buckling?
-            // if (iarclength == num_arclength_per_lbuckle) {
-            //     sigma = 1.0; // first time
-            // // } else {
-            // //     if (eigval < 2.0) {
-            // //         sigma = 0.01;
-            // //     }
-            // // }
-            buckling->setSigma(1.0);
+            if (iarclength == num_arclength_per_lbuckle) {
+                sigma = 1.0; // first time
+            } else {
+                if (eigval < 2.0) {
+                    sigma = 0.01;
+                }
+            }
+            buckling->setSigma(sigma);
             // option 1 - finds K_t(u) + lambda * |du| * d/ds K_t(u + s * du / |du|) 
             //     but then if |du| is much smaller than |u|, the lambda does not predict multiples on original lambda correctly
             buckling->solve_local(NULL, vars, ksm_print_buckling, delta_vars);
@@ -523,8 +506,10 @@ int main(int argc, char *argv[]) {
             //     then easier to determine predicted final lambda for final buckling..
             // buckling->solve(NULL, vars, ksm_print_buckling, NULL); // this one gives G(u,u)
             eigval = buckling->extractEigenvalue(0, &loc_error);
-            // adjust eigval (not sure if this part is right)
-            // eigval *= lambda_init;
+            if (TacsRealPart(eigval) < TacsRealPart(min_NL_eigval)) {
+                nonlinear_eigval = lambda;
+                break; // break out of the arc length loop and we are done with nonlinear buckling!
+            }
 
             // would also really like to write out the linear eigenvalues and |u|, etc. to a custom buckling .out file
             // so we can monitor the progress as it moves towards nonlinear buckling
@@ -532,17 +517,13 @@ int main(int argc, char *argv[]) {
             if (!fail_flag && fp) { // not failed write out to file
                 // prediction for 
                 // pred_lambda_NL = lambda * eigval
-                TacsScalar pred_lambda_NL = lambda + eigval * (lambda - lambda_old);
+                TacsScalar pred_lambda_NL = lambda + eigval * lambda * delta_vars->norm() / vars->norm();
                 TacsScalar unorm_over_lambda = vars->norm() / lambda; // shows geometric NL stiffening
                 fprintf(fp, "%2d %15.6e %15.6e %15.6e %15.6e %15.6e %15.6e %15.6e \n", iarclength + 1, 
                     TacsRealPart(lambda), TacsRealPart(unorm_over_lambda), TacsRealPart(dlambda_ds),
                     TacsRealPart(eigval), TacsRealPart(loc_error), TacsRealPart(linear_eigval), 
                     TacsRealPart(pred_lambda_NL));
                 fflush(fp);
-            }
-
-            if (TacsRealPart(eigval * lambda_init) < 10.0) {
-                num_arclength_per_lbuckle = 3;
             }
 
         }
@@ -559,15 +540,6 @@ int main(int argc, char *argv[]) {
         std::string filename = "_buckling/mech-nlbuckle" + std::to_string(iarclength) + ".f5";
         const char *cstr_filename = filename.c_str();
         f5->writeToFile(cstr_filename);
-
-        if (iarclength % num_arclength_per_lbuckle == 0 && iarclength != 0) {
-            printf("eigval = %.8e, min_NL_eigval = %.5e\n", eigval, min_NL_eigval);
-            // if (TacsRealPart(eigval) < TacsRealPart(min_NL_eigval) || TacsRealPart(loc_error) > 1e-4) {
-            if (TacsRealPart(eigval) < TacsRealPart(min_NL_eigval) || TacsRealPart(loc_error) > 1e-1) {
-                nonlinear_eigval = lambda;
-                break; // break out of the arc length loop and we are done with nonlinear buckling!
-            }
-        }
 
     } // end of outer arc length steps for loop
 

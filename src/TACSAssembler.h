@@ -93,6 +93,9 @@ class TACSAssembler : public TACSObject {
   void setTemperatures(TacsScalar temp);
 
   void getAverageStresses(ElementType elem_type, TacsScalar *avgStresses, int compNum);
+  void getMaxStresses(ElementType elem_type, TacsScalar *maxStresses, int compNum);
+  void getMinStresses(ElementType elem_type, TacsScalar *minStresses, int compNum);
+  
   void setComplexStepGmatrix(bool flag);
 
   // Set additional information about the design vector

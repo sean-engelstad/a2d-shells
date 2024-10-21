@@ -1,4 +1,7 @@
 #pragma once
+#include "TACSAssembler.h"
+#include "TACSCreator.h"
+#include "TACSMeshLoader.h"
 
 // NOTE : on lines 76-100, I changed removed the rotx BCs from the BC set
 // since this might have been affecting the buckling mode solution..

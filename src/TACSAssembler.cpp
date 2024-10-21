@@ -4527,7 +4527,7 @@ void TACSAssembler::getAverageStresses(ElementType elem_type,
                                        TacsScalar *avgStresses,
                                        int componentNum) {
   // TacsScalar *avgStresses = new TacsScalar[9];
-  // memset(avgStresses, 0, 9);
+  memset(avgStresses, 0, 9 * sizeof(TacsScalar));
   int nvals;
 
   // Retrieve pointers to temporary storage
@@ -4555,5 +4555,75 @@ void TACSAssembler::getAverageStresses(ElementType elem_type,
 
   for (int j = 0; j < 9; j++) {
     avgStresses[j] /= numCompElems;
+  }
+}
+
+/* get max output stress resultants from TACS*/
+void TACSAssembler::getMaxStresses(ElementType elem_type,
+                                   TacsScalar *maxStresses,
+                                   int componentNum) {
+  // TacsScalar *avgStresses = new TacsScalar[9];
+  // memset(avgStresses, 0, 9);
+  for (int i = 0; i < 9; i++) {
+    maxStresses[i] = -1e40;
+  }
+  int nvals;
+
+  // Retrieve pointers to temporary storage
+  TacsScalar *elemXpts, *vars, *dvars, *ddvars;
+  getDataPointers(elementData, &vars, &dvars, &ddvars, NULL, &elemXpts, NULL,
+                  NULL, NULL);
+
+  int numCompElems = 0;
+  for (int i = 0; i < numElements; i++) {
+    // note TACS component nums are 0-based
+    if (elements[i]->getComponentNum() == componentNum) {
+      numCompElems += 1;
+      int ptr = elementNodeIndex[i];
+      int len = elementNodeIndex[i + 1] - ptr;
+      const int *nodes = &elementTacsNodes[ptr];
+      xptVec->getValues(len, nodes, elemXpts);
+      varsVec->getValues(len, nodes, vars);
+      dvarsVec->getValues(len, nodes, dvars);
+      ddvarsVec->getValues(len, nodes, ddvars);
+
+      elements[i]->getMaxStresses(i, elem_type, elemXpts, vars, dvars, ddvars,
+                                      &maxStresses[0]);
+    }
+  }
+}
+
+/* get max output stress resultants from TACS*/
+void TACSAssembler::getMinStresses(ElementType elem_type,
+                                   TacsScalar *minStresses,
+                                   int componentNum) {
+  // TacsScalar *avgStresses = new TacsScalar[9];
+  // memset(avgStresses, 0, 9);
+  for (int i = 0; i < 9; i++) {
+    minStresses[i] = 1e40;
+  }
+  int nvals;
+
+  // Retrieve pointers to temporary storage
+  TacsScalar *elemXpts, *vars, *dvars, *ddvars;
+  getDataPointers(elementData, &vars, &dvars, &ddvars, NULL, &elemXpts, NULL,
+                  NULL, NULL);
+
+  int numCompElems = 0;
+  for (int i = 0; i < numElements; i++) {
+    // note TACS component nums are 0-based
+    if (elements[i]->getComponentNum() == componentNum) {
+      numCompElems += 1;
+      int ptr = elementNodeIndex[i];
+      int len = elementNodeIndex[i + 1] - ptr;
+      const int *nodes = &elementTacsNodes[ptr];
+      xptVec->getValues(len, nodes, elemXpts);
+      varsVec->getValues(len, nodes, vars);
+      dvarsVec->getValues(len, nodes, dvars);
+      ddvarsVec->getValues(len, nodes, ddvars);
+
+      elements[i]->getMinStresses(i, elem_type, elemXpts, vars, dvars, ddvars,
+                                      &minStresses[0]);
+    }
   }
 }

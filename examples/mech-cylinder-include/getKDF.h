@@ -44,7 +44,7 @@ void getNonlinearBucklingKDF(MPI_Comm comm, int run,
 
     TacsScalar rho = 2700.0;
     TacsScalar specific_heat = 921.096;
-    TacsScalar E = 70e3; // 70e9 (lower value of E helps solve more accurately, doesn't affect buckling loads with disp control)
+    TacsScalar E = 70e4; // 70e9 (lower value of E helps solve more accurately, doesn't affect buckling loads with disp control)
     // it just affects scale of energy and numerical issues in the SEP solver (so better to have lower E here)
     TacsScalar nu = 0.3;
     TacsScalar ys = 270.0;
@@ -497,6 +497,11 @@ void getNonlinearBucklingKDF(MPI_Comm comm, int run,
                     TacsRealPart(pred_lambda_NL));
                 fflush(fp);
             }
+            if (fail_flag && fp) {
+                // report failed deformation / solve
+                fprintf(fp, "failed solve.. with residual %.8e\n", TacsRealPart(res->norm()));
+                fflush(fp);
+            }
         }
 
 
@@ -541,7 +546,7 @@ void getNonlinearBucklingKDF(MPI_Comm comm, int run,
 
         if (iarclength % num_arclength_per_lbuckle == 0 && iarclength != 0 && useEigvals) {
             printf("eigval = %.8e\n", eigval);
-            if (TacsRealPart(eigval) < 0.3 || TacsRealPart(loc_error) > 1e-1 || std::isnan(TacsRealPart(loc_error))) {
+            if (TacsRealPart(eigval) < 0.1 || TacsRealPart(loc_error) > 1e-1 || std::isnan(TacsRealPart(loc_error))) {
                 nonlinear_eigval = lambda;
                 break; // break out of the arc length loop and we are done with nonlinear buckling!
             }

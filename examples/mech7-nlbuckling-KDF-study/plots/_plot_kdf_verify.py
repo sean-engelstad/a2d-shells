@@ -3,13 +3,20 @@ import pandas as pd
 import matplotlib.pyplot as plt
 
 # r/t of each cylinder design
-rt_values = np.array([1000, 500, 300, 100, 50, 25, 10])
-nasa_kdfs = np.array([0.223, 0.322, 0.404, 0.581, 0.678, 0.758, 0.82])
-# from 10k element data
-tacs_kdfs = np.array([0.61, 0.664, 0.677, 0.691, 0.705, 0.763, 0.82])
+df = pd.read_csv("../kdfs.csv", skiprows=1)
+print(df)
+print(df.columns[1])
+nelems = df[["nelems"]].to_numpy()
+rt_values = df[[" r/t"]].to_numpy()
+nasa_kdfs = df[[" nasaKDF"]].to_numpy()
+tacs_kdfs = df[[" tacsKDF"]].to_numpy()
 
-plt.plot(rt_values[::-1], nasa_kdfs[::-1], "o-", label="nasa-kdf")
-plt.plot(rt_values[::-1], tacs_kdfs[::-1], "o-", label="tacs-mode1-kdf")
+nelems_unique = np.unique(nelems)
+for i_nelems, c_nelems in enumerate(nelems_unique):
+    nelems_mask = np.logical_and(nelems == c_nelems, rt_values > 10)
+    if i_nelems == 0:
+        plt.plot(rt_values[nelems_mask], nasa_kdfs[nelems_mask], "ko--", label="nasa-kdf")
+    plt.plot(rt_values[nelems_mask], tacs_kdfs[nelems_mask], "o-", label=f"tacs-{c_nelems/1000:.0f}k")
 
 plt.xlabel("r/t")
 plt.xscale('log')

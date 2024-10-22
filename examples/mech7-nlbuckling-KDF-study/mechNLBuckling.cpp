@@ -55,7 +55,7 @@ int main(int argc, char *argv[]) {
 
             // writeout KDFs to csv file
             if (fp) {
-                fprintf(fp, "%10.5e, %10.5e, %10.5e, %10.5e\n", nelems, rt, TacsRealPart(nasaKDF[i_rt]), TacsRealPart(tacsKDF[i_rt]));
+                fprintf(fp, "%d, %10.5e, %10.5e, %10.5e\n", nelems, rt, TacsRealPart(nasaKDF[i_rt]), TacsRealPart(tacsKDF[i_rt]));
                 fflush(fp);
             }
         }   

@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 import argparse
 
 # read the csv file "load_disp.csv" and plot it
-ind = 4
+ind = 1
 df = pd.read_csv(f"../_runs/load-disp{ind}.csv")
 min_load = df[["minS11"]].to_numpy()
 avg_load = df[["avgS11"]].to_numpy()

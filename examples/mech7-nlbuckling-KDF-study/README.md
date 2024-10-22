@@ -1,0 +1,2 @@
+# how to view output files
+* For nonlinear buckling modes (the nonlinear static u^* at buckling). View the deformed state with v*jHat+w*kHat deformation. And then view the signed deformation with u_r which is proportional to v*coordsY + w*coordsZ.

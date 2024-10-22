@@ -10,10 +10,13 @@ int main(int argc, char *argv[]) {
 
     // Get the rank
     MPI_Comm comm = MPI_COMM_WORLD;
+    int rank;
+    MPI_Comm_rank(comm, &rank);
 
     const int NRUNS = 7;
     double rtVals[NRUNS] = {1000.0, 500.0, 300.0, 100.0, 50.0, 25.0, 10.0};
-    int meshSizes[NRUNS] = {40000, 20000, 10000, 10000, 10000, 10000, 10000};
+    // int meshSizes[NRUNS] = {40000, 20000, 10000, 10000, 10000, 10000, 10000};
+    int meshSizes[3] = {10000, 20000, 40000};
     TacsScalar nasaKDF[NRUNS] = { };
     TacsScalar tacsKDF[NRUNS] = { };
 
@@ -38,20 +41,26 @@ int main(int argc, char *argv[]) {
     
 
     // run each KDF simulation for mechanical nonlinear buckling
-    for (int irun = NRUNS-1; irun >= 0; irun--) {
-        double rt = rtVals[irun];
-        int nelems = meshSizes[irun]; // 5000, 10000
-        getNonlinearBucklingKDF(
-            comm, 1, filePrefix, t, rt, Lr, NUM_IMP, &imperfections[0],
-            useEigvals, nelems, &nasaKDF[irun], &tacsKDF[irun]
-        );
+    int irun = 0;
+    for (int inelems = 0; inelems < 3; inelems++) {
+        for (int i_rt = NRUNS-1; i_rt >= 0; i_rt--) {
+            irun++;
+            double rt = rtVals[i_rt];
+            // int nelems = meshSizes[irun]; // 5000, 10000
+            int nelems = meshSizes[inelems];
+            getNonlinearBucklingKDF(
+                comm, irun, filePrefix, t, rt, Lr, NUM_IMP, &imperfections[0],
+                useEigvals, nelems, &nasaKDF[i_rt], &tacsKDF[i_rt]
+            );
 
-        // writeout KDFs to csv file
-        if (fp) {
-            fprintf(fp, "%10.5e, %10.5e, %10.5e, %10.5e\n", nelems, rt, TacsRealPart(nasaKDF[irun]), TacsRealPart(tacsKDF[irun]));
-            fflush(fp);
-        }
-    }   
+            // writeout KDFs to csv file
+            if (fp) {
+                fprintf(fp, "%10.5e, %10.5e, %10.5e, %10.5e\n", nelems, rt, TacsRealPart(nasaKDF[i_rt]), TacsRealPart(tacsKDF[i_rt]));
+                fflush(fp);
+            }
+        }   
+    }
+    
 
     MPI_Finalize();
 

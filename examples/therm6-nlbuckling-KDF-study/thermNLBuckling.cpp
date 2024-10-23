@@ -20,6 +20,7 @@ int main(int argc, char *argv[]) {
     TacsScalar tacsKDF[NRUNS] = { };
     double E = 70e9; // 70e3
     double conv_eigval = 0.3;
+    double temperature = 1.0; // maybe should be list?
 
     double t = 0.002;
     double Lr = 2.0;
@@ -50,7 +51,7 @@ int main(int argc, char *argv[]) {
             // int nelems = meshSizes[irun]; // 5000, 10000
             int nelems = meshSizes[inelems];
             getNonlinearBucklingKDF(
-                comm, irun, filePrefix, t, rt, Lr, E, conv_eigval, 
+                comm, irun, filePrefix, t, rt, Lr, E, conv_eigval, temperature,
                 NUM_IMP, &imperfections[0],
                 useEigvals, nelems, &nasaKDF[i_rt], &tacsKDF[i_rt]
             );

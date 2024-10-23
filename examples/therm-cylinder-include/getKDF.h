@@ -59,7 +59,7 @@ void getNonlinearBucklingKDF(MPI_Comm comm, int run,
     createAssembler(comm, 2, nx, ny, udisp, L, R, shell, &assembler, &creator);
     
     // set the temperatures into the structure
-    TacsScalar temperature = 1.0;
+    // TacsScalar temperature = 1.0;
     assembler->setTemperatures(temperature);
 
     // Create the design vector

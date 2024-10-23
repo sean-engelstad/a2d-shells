@@ -31,15 +31,21 @@ int main(int argc, char *argv[]) {
     // TacsScalar imperfections[NUM_IMP] = {0.0 * t, 0.0, 0.0 };
     TacsScalar imperfections[NUM_IMP] = {0.5 * t, 0.0, 0.0 };
     bool useEigvals = true; // if false uses load-disp curve
+    bool hot_start = true;
 
     FILE *fp;
     if (rank == 0) {
-        fp = fopen("kdfs.csv", "w");
-        if (fp) {
-            fprintf(fp, "KDFs of cylinder with 0.5 * t mode 1 imperfection, t = %10.3e, L/r = %10.3e\n", t, Lr);
-            fprintf(fp, "nelems, r/t, nasaKDF, tacsKDF\n");
-            fflush(fp);
+        if (hot_start) {
+            fp = fopen("kdfs.csv", "w");
+            if (fp) {
+                fprintf(fp, "KDFs of cylinder with 0.5 * t mode 1 imperfection, t = %10.3e, L/r = %10.3e\n", t, Lr);
+                fprintf(fp, "nelems, r/t, nasaKDF, tacsKDF\n");
+                fflush(fp);
+            }
+        } else {
+            fp = fopen("kdfs.csv", "a");
         }
+        
     }
     
 
@@ -48,6 +54,9 @@ int main(int argc, char *argv[]) {
     for (int inelems = 0; inelems < 3; inelems++) {
         for (int i_rt = NRUNS-1; i_rt >= 0; i_rt--) {
             irun++;
+            if (irun <= 3) { // temporary to not have to rerun as much
+                continue;
+            }
             double rt = rtVals[i_rt];
             // int nelems = meshSizes[irun]; // 5000, 10000
             int nelems = meshSizes[inelems];

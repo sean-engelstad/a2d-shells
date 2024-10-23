@@ -15,7 +15,7 @@ int main(int argc, char *argv[]) {
     double rt = 100;
     double Lr = 2.0;
     const int NUM_IMP = 3;
-    double temperature = 1.0;
+    double temperature = 1.0; // K (may have to adjust depending on the)
     double E = 70e5; // 70e9 // can scale the problem (won't affect disps)
     double conv_eigval = 0.3; // 0.01, 0.1
     // worried that if I scale down too much, won't solve as deeply though.
@@ -29,7 +29,8 @@ int main(int argc, char *argv[]) {
     TacsScalar nasaKDF, tacsKDF;
 
     getNonlinearBucklingKDF(
-        comm, 1, filePrefix, t, rt, Lr, E, conv_eigval, NUM_IMP, &imperfections[0],
+        comm, 1, filePrefix, t, rt, Lr, E, conv_eigval, temperature, 
+        NUM_IMP, &imperfections[0],
         useEigvals, nelems, &nasaKDF, &tacsKDF
     );
 

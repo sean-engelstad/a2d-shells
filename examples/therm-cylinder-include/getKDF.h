@@ -11,7 +11,7 @@
 void getNonlinearBucklingKDF(MPI_Comm comm, int run, 
     std::string filePrefix,
     double t, double rt, double Lr, 
-    double E, double conv_eigval,
+    double E, double conv_eigval, double temperature,
     int num_imperfections, TacsScalar *imperfection_sizes,
     bool useEigvals,
     int nelems,
@@ -21,15 +21,9 @@ void getNonlinearBucklingKDF(MPI_Comm comm, int run,
     int rank;
     MPI_Comm_rank(comm, &rank);
 
-
-    // double Lr = 2.0; // default 2.0
-    // double rt = 500; // 100, 50, 25
     double R = t * rt; // m
     double L = R * Lr;
-
-    // need a better way to predict the disp based on closed-form solutions of linear buckling
-    // double udisp = -1e-5; // compressive udisp (for r/t = 100)
-    double udisp = -1e-5; // ( for r/t = 25 )to be most accurate want udisp about 1/200 to 1/300 the linear buckling disp
+    double udisp = 0.0; // ( for r/t = 25 )to be most accurate want udisp about 1/200 to 1/300 the linear buckling disp
 
     // select nelems and it will select to retain isotropic elements (good element AR)
     // want dy = 2 * pi * R / ny the hoop elem spacing to be equal dx = L / nx the axial elem spacing
@@ -45,11 +39,9 @@ void getNonlinearBucklingKDF(MPI_Comm comm, int run,
 
     TacsScalar rho = 2700.0;
     TacsScalar specific_heat = 921.096;
-    // TacsScalar E = 70e3; // 70e9 (lower value of E helps solve more accurately, doesn't affect buckling loads with disp control)
-    // it just affects scale of energy and numerical issues in the SEP solver (so better to have lower E here)
     TacsScalar nu = 0.3;
     TacsScalar ys = 270.0;
-    TacsScalar cte = 24.0e-6;
+    TacsScalar cte = 10.0e-6;
     TacsScalar kappa = 230.0;
     TACSMaterialProperties *props = new TACSMaterialProperties(rho, specific_heat, E, nu, ys, cte, kappa);
 
@@ -65,12 +57,11 @@ void getNonlinearBucklingKDF(MPI_Comm comm, int run,
     shell = new TACSQuad4NonlinearShell(transform, con); 
     shell->incref();
     createAssembler(comm, 2, nx, ny, udisp, L, R, shell, &assembler, &creator);
-
-    // Solve the linear static analysis
-    if (rank == 0) {
-        printf("Solving linear system..\n");
-    }
     
+    // set the temperatures into the structure
+    TacsScalar temperature = 1.0;
+    assembler->setTemperatures(temperature);
+
     // Create the design vector
     TACSBVec *x = assembler->createDesignVec();
     x->incref();
@@ -257,7 +248,7 @@ void getNonlinearBucklingKDF(MPI_Comm comm, int run,
 
     // nonlinear static important input settings
     // ------------------------------------------------------------
-    double lambda_init = 280.0 * 0.05;
+    double lambda_init = linear_eigval * 0.05;
     double target_delta_lambda = 5.0;
     int max_continuation_iters = 800; // default 300 // for prelim Newton solve to lambda_init
     int max_correction_iters = 100; // for the arc length method static regime
@@ -308,6 +299,7 @@ void getNonlinearBucklingKDF(MPI_Comm comm, int run,
     // -----------------------------------------------------------
 
     // Compute and factor the tangent stiffness matrix
+    assembler->setTemperatures(lambda * temperature);
     assembler->assembleJacobian(1.0, 0.0, 0.0, res, kmat, TACS_MAT_NORMAL, 1.0, lambda);
     pc->factor();
     gmres->setTolerances(tangent_rtol, tangent_atol);
@@ -319,6 +311,7 @@ void getNonlinearBucklingKDF(MPI_Comm comm, int run,
     // Newton solve until convergence to (u0, lambda0)
     for (int k = 0; k < max_continuation_iters; k++) {
         // update the nonlinear residaul
+        assembler->setTemperatures(lambda * temperature);
         assembler->setVariables(vars);
         assembler->assembleRes(res, 1.0, lambda); // lambda input here scales the disp control BCs with load factor too
         res->axpy(-lambda, f); // add in load control effects
@@ -357,6 +350,7 @@ void getNonlinearBucklingKDF(MPI_Comm comm, int run,
     TacsScalar dlambda_ds = 0.0; 
     for (int iarclength = 0; !hit_buckling && iarclength < max_continuation_iters; iarclength++) {
         // new arclength step => update the residual, etc.
+        assembler->setTemperatures(lambda * temperature);
         assembler->setVariables(vars);
         assembler->assembleJacobian(1.0, 0.0, 0.0, res, kmat, TACS_MAT_NORMAL, 1.0, lambda);
         res->axpy(-lambda, f); // add in load control effects
@@ -413,6 +407,7 @@ void getNonlinearBucklingKDF(MPI_Comm comm, int run,
         // Now compute the next iteration
         TacsScalar init_res_norm = 0.0;
         for (int j = 0; j < max_correction_iters; j++) {
+            assembler->setTemperatures(lambda * temperature);
             assembler->setVariables(vars);
             assembler->assembleRes(res, 1.0, lambda);
             res->axpy(-lambda, f);
@@ -541,7 +536,7 @@ void getNonlinearBucklingKDF(MPI_Comm comm, int run,
 
         // write out file from this arc length step
         assembler->setVariables(vars); // set orig values back in
-        std::string filename = "_buckling/mech-nlbuckle" + std::to_string(iarclength) + ".f5";
+        std::string filename = "_buckling/therm-nlbuckle" + std::to_string(iarclength) + ".f5";
         const char *cstr_filename = filename.c_str();
         f5->writeToFile(cstr_filename);
 

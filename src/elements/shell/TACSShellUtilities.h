@@ -568,6 +568,15 @@ void TacsShellAddDispGradSens(const double pt[], const TacsScalar T[],
   TacsScalar dd0xi[6];
   TacsShellExtractFrame(du1d, dd0xi);
 
+  // debug for 1st order derivs
+  // for (int i = 0; i < 3; i++) {
+  //   printf("dd0[%d] %.8e\n", i, dd0[i]);
+  // }
+  // for (int j = 0; j < 6; j++) {
+  //   printf("dd0xi[%d] %.8e\n", j, dd0xi[j]);
+  //   printf("du0xi[%d] %.8e\n", j, du0xi[j]);
+  // }
+
   // Compute the director field and the gradient of the director
   // field at the specified point
   basis::template addInterpFieldsTranspose<3, 3>(pt, dd0, dd);
@@ -631,6 +640,25 @@ void TacsShellAddDispGradHessian(const double pt[], const TacsScalar T[],
 
   TacsScalar d2d0xiu0xi[36], d2d0d0xi[18];
   TacsShellExtractFrameMixedSens(d2u0du1d, d2d0xiu0xi, d2d0d0xi);
+
+  for (int i1 = 0; i1 < 9; i1++) {
+    printf("d2d0[%d] = %.8e\n", i1, d2d0[i1]);
+  }
+  for (int i2 = 0; i2 < 18; i2++) {
+    printf("d2d0d0xi[%d] = %.8e\n", i2, d2d0d0xi[i2]);
+  }
+  for (int i3 = 0; i3 < 18; i3++) {
+    printf("d2d0u0xi[%d] = %.8e\n", i3, d2d0u0xi[i3]);
+  }
+  for (int i5 = 0; i5 < 36; i5++) {
+    printf("d2d0xi[%d] = %.8e\n", i5, d2d0xi[i5]);
+  }
+  for (int i6 = 0; i6 < 36; i6++) {
+    printf("d2d0xiu0xi[%d] = %.8e\n", i6, d2d0xiu0xi[i6]);
+  }
+  for (int i7 = 0; i7 < 36; i7++) {
+    printf("d2u0xi[%d] = %.8e\n", i7, d2u0xi[i7]);
+  }
 
   // df/(d(u0d)d(u1d))
   basis::template addInterpFieldsOuterProduct<3, 3, 3, 3>(pt, d2d0, d2d);

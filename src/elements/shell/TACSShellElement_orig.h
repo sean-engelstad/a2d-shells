@@ -567,15 +567,15 @@ void TACSShellElementOrig<quadrature, basis, director, model>::addJacobian(
     TacsScalar du0x[9], du1x[9], de0ty[6];
     model::evalStrainSens(detXd, s, u0x, u1x, du0x, du1x, de0ty);
 
-    for (int j = 0; j < 6; j++) {
-      printf("e0ty[%d] = %.8e\n", j, e0ty[j]);
-    }
-    for (int i = 0; i < 9; i++) {
-      printf("u0x[%d] = %.8e\n", i, u0x[i]);
-      printf("u1x[%d] = %.8e\n", i, u1x[i]);
-      printf("E[%d] = %.8e\n", i, e[i]);
-      printf("S[%d] = %.8e\n", i, s[i]);
-    }
+    // for (int j = 0; j < 6; j++) {
+    //   printf("e0ty[%d] = %.8e\n", j, e0ty[j]);
+    // }
+    // for (int i = 0; i < 9; i++) {
+    //   printf("u0x[%d] = %.8e\n", i, u0x[i]);
+    //   printf("u1x[%d] = %.8e\n", i, u1x[i]);
+    //   printf("E[%d] = %.8e\n", i, e[i]);
+    //   printf("S[%d] = %.8e\n", i, s[i]);
+    // }
     // for debugging purposes
     TacsScalar Uelem =
         0.5 * detXd *
@@ -592,12 +592,17 @@ void TACSShellElementOrig<quadrature, basis, director, model>::addJacobian(
     TacsScalar det = detXd * s[8];
     basis::template addInterpFieldsTranspose<1, 1>(pt, &det, detn);
 
+    // debug first order derivs
+    // printf("det %.8e\n", det);
+
     TacsShellAddDispGradSens<vars_per_node, basis>(pt, T, XdinvT, XdinvzT, du0x,
                                                    du1x, res, dd);
 
     // Add the contribution from the drilling stiffness
     TacsScalar d2et = detXd * alpha * Cs[21];
     basis::template addInterpFieldsOuterProduct<1, 1, 1, 1>(pt, &d2et, d2etn);
+
+    printf("d2et = %.8e\n", d2et);
 
     // Add the contributions to the residual from du0x, du1x and dCt
     TacsShellAddDispGradHessian<vars_per_node, basis>(
@@ -607,6 +612,16 @@ void TACSShellElementOrig<quadrature, basis, director, model>::addJacobian(
     TacsScalar dgty[6], d2gty[36];
     mat3x3SymmTransformTransSens(XdinvT, de0ty, dgty);
     mat3x3SymmTransformTransHessian(XdinvT, d2e0ty, d2gty);
+
+    for (int i8 = 0; i8 < 36; i8++) {
+      printf("d2gty[%d] = %.8e\n", i8, d2gty[i8]);
+    }
+
+    // // debug first order derivs part 2
+    // for (int k = 0; k < 6; k++) {
+    //   printf("de0ty[%d] %.8e\n", k, de0ty[k]);
+    //   printf("dgty[%d] %.8e\n", k, dgty[k]);
+    // }
 
     // Evaluate the tying strain
     basis::addInterpTyingStrainTranspose(pt, dgty, dety);
@@ -674,6 +689,14 @@ void TACSShellElementOrig<quadrature, basis, director, model>::addJacobian(
   director::template addRotationConstrJacobian<vars_per_node, offset,
                                                num_nodes>(alpha, vars, res,
                                                           mat);
+
+  // check the values in the matrix (compare for debug) 
+  int index = 0;
+  for (int irow = 0; irow < 24; irow++) {
+    for (int icol = 0; icol < 24; icol++, ++index) {
+      printf("Kelem[%d,%d] = %.8e\n", irow, icol, mat[index]);
+    }
+  }
 }
 
 template <class quadrature, class basis, class director, class model>

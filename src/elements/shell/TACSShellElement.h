@@ -401,7 +401,8 @@ void TACSShellElement<quadrature, basis, director, model>::addResidual(
     transform->computeTransform(Xxi.get_data(), n0.get_data(), T.get_data()); 
 
     // compute ABD matrix from shell theory (prospective)
-    A2D::SymMat<TacsScalar,9> ABD; // normally ABD is 6x6, but this one includes transverse shear and drill strains
+    // A2D::SymMat<TacsScalar,9> ABD; // normally ABD is 6x6, but this one includes transverse shear and drill strains
+    A2D::Mat<TacsScalar,9,9> ABD;
     con->getABDmatrix(0, pt, X.get_data(), ABD.get_data()); // TODO make this routine
 
     // passive variables for strain energy stack
@@ -417,19 +418,32 @@ void TACSShellElement<quadrature, basis, director, model>::addResidual(
     const A2D::MatOp NORMAL = A2D::MatOp::NORMAL, TRANSPOSE = A2D::MatOp::TRANSPOSE;
     const A2D::ShellStrainType STRAIN_TYPE = A2D::ShellStrainType::LINEAR; // if condition on type of model here..
 
+    // TODO : fix order of MatRotateFrame (backwards)
+    auto prelim_coord_stack = A2D::MakeStack(
+      A2D::ShellAssembleFrame(Xxi, n0, Xd), 
+      A2D::ShellAssembleFrame(nxi, zero, Xdz), 
+      A2D::MatInv(Xd, Xdinv),
+      A2D::MatDet(Xd, detXd),
+      A2D::MatMatMult(Xdinv, T, XdinvT)
+    ); // auto evaluates on runtime
+    // want this to not be included in Hessian/gradient backprop
+
+    // printf("detXd = %.8e\n", detXd.value());
+    // for (int i = 0; i < 9; i++) {
+    //   printf("Xd[%d] = %.8e\n", i, Xd.value().get_data()[i]);
+    //   printf("Xdz[%d] = %.8e\n", i, Xdz.value().get_data()[i]);
+    //   printf("Xdinv[%d] = %.8e\n", i, Xdinv.value().get_data()[i]);
+    //   printf("XdinvT[%d] = %.8e\n", i, XdinvT.value().get_data()[i]);     
+    // }
+
     // compute the strain energy from d0, d0xi, u0xi
     auto strain_energy_stack = A2D::MakeStack(
       // part 1 - compute shell basis and transform matrices (passive portion)
-      A2D::ShellAssembleFrame(Xxi, n0, Xd), 
-      A2D::ShellAssembleFrame(nxi, zero, Xdz), 
       A2D::ShellAssembleFrame(u0xi, d0, u0xi_frame),
       A2D::ShellAssembleFrame(d0xi, zero, u1xi_frame),
-      A2D::MatInv(Xd, Xdinv),
-      A2D::MatDet(Xd, detXd),
-      A2D::MatMatMult(Xdinv, T, XdinvT),
       // part 2 - compute u0x midplane disp gradient
       A2D::MatMatMult(u0xi_frame, Xdinv, u0x_tmp),
-      A2D::MatRotateFrame(u0x_tmp, T, u0x),
+      A2D::MatRotateFrame(T, u0x_tmp, u0x),
       // part 3 - compute u1x director disp gradient
       A2D::MatMatMult(u1xi_frame, Xdinv, u1x_term1),
       // computes u0xi_frame * Xdinv * Xdz * Xdinv => u1x_term2 
@@ -437,13 +451,13 @@ void TACSShellElement<quadrature, basis, director, model>::addResidual(
       A2D::MatMatMult(u1x_tmp1, Xdz, u1x_tmp2), 
       A2D::MatMatMult(u1x_tmp2, Xdinv, u1x_term2),
       // compute final u1x = T^T * (u0x * Xdinv - u1x * Xdinv * Xdz * Xdinv) * T
-      A2D::MatSum(1.0, u1x_term1, -1.0, u1x_term2, u1x_sum),
-      A2D::MatRotateFrame(u1x_sum, T, u1x),
+      A2D::MatSum(1.0, u1x_term1, -1.0, u1x_term2, u1x_sum), // for some reason this entry has no hzero?
+      A2D::MatRotateFrame(T, u1x_sum, u1x),
       // part 4 - compute transformed tying strain e0ty
-      A2D::MatRotateFrame(gty, XdinvT, e0ty),
+      A2D::SymMatRotateFrame(XdinvT, gty, e0ty),
       // part 5 - compute strains, stresses and then strain energy
       A2D::ShellStrain<STRAIN_TYPE>(u0x, u1x, e0ty, et, E),
-      A2D::MatMatMult(ABD, E, S),
+      A2D::MatVecMult(ABD, E, S),
       // part 6 - compute strain energy
       A2D::VecDot(E, S, ES_dot),
       A2D::Eval(0.5 * weight * detXd * ES_dot, Uelem)
@@ -712,15 +726,15 @@ void TACSShellElement<quadrature, basis, director, model>::addJacobian(
       A2D::Eval(0.5 * weight * detXd * ES_dot, Uelem)
     );
 
-    for (int j = 0; j < 6; j++) {
-      printf("e0ty[%d] = %.8e\n", j, e0ty.value().get_data()[j]);
-    }
-    for (int i = 0; i < 9; i++) {
-      printf("u0x[%d] = %.8e\n", i, u0x.value().get_data()[i]);
-      printf("u1x[%d] = %.8e\n", i, u1x.value().get_data()[i]);
-      printf("E[%d] = %.8e\n", i, E.value().get_data()[i]);
-      printf("S[%d] = %.8e\n", i, S.value().get_data()[i]);
-    }
+    // for (int j = 0; j < 6; j++) {
+    //   printf("e0ty[%d] = %.8e\n", j, e0ty.value().get_data()[j]);
+    // }
+    // for (int i = 0; i < 9; i++) {
+    //   printf("u0x[%d] = %.8e\n", i, u0x.value().get_data()[i]);
+    //   printf("u1x[%d] = %.8e\n", i, u1x.value().get_data()[i]);
+    //   printf("E[%d] = %.8e\n", i, E.value().get_data()[i]);
+    //   printf("S[%d] = %.8e\n", i, S.value().get_data()[i]);
+    // }
     printf("Uelem = %.8e\n", Uelem.value());
     // for (int i = 0; i < 9; i++) {
     //   printf("Xd[%d] = %.8e\n", i, Xd.value().get_data()[i]);
@@ -735,10 +749,49 @@ void TACSShellElement<quadrature, basis, director, model>::addJacobian(
     // -------------------------------------------------
     Uelem.bvalue() = 1.0;
     Uelem.hvalue() = 0.0;
-    strain_energy_stack.reverse();
+    // strain_energy_stack.reverse(); // don't want to call this twice (called in hextract)
+
+    // reverse mode 1st + 2nd order AD for the strain energy stack
+    // -----------------------------------------------------
+
+    // create submatrix Hessian matrices
+    A2D::Mat<TacsScalar,1,1> d2et;
+    A2D::Mat<TacsScalar, 3, 3> d2d0;
+    A2D::Mat<TacsScalar, 3, 6> d2d0d0xi, d2d0u0xi;
+    A2D::Mat<TacsScalar, 6, 3> d2gtyd0;
+    A2D::Mat<TacsScalar, 6, 6> d2d0xi, d2d0xiu0xi, d2u0xi, d2gty, d2gtyd0xi, d2gtyu0xi;
+
+    // d0, d0xi, u0xi, et, gty
+    const int ncomp = 22;
+    A2D::SymMat<TacsScalar, ncomp> hess;
+    auto in = A2D::MakeTieTuple<TacsScalar, A2D::ADseed::p>(d0, d0xi, u0xi, gty, et);
+    auto out = A2D::MakeTieTuple<TacsScalar, A2D::ADseed::h>(d0, d0xi, u0xi, gty, et);
+    strain_energy_stack.hextract(in, out, hess);
+
+    // try for debugging
+    // // strain_energy_stack.hextract(d0.pvalue(), d0.hvalue(), d2d0);
+    // // strain_energy_stack.hextract(d0.pvalue(), d0xi.hvalue(), d2d0d0xi);
+    // // strain_energy_stack.hextract(d0.pvalue(), u0xi.hvalue(), d2d0u0xi);
+    // strain_energy_stack.hextract(d0xi.pvalue(), d0xi.hvalue(), d2d0xi);
+    // // strain_energy_stack.hextract(d0xi.pvalue(), u0xi.hvalue(), d2d0xiu0xi);
+    // // strain_energy_stack.hextract(u0xi.pvalue(), u0xi.hvalue(), d2u0xi);
 
     // printf("Post strain energy stack.reverse\n");
 
+    // debug first order derivs
+    // printf("det %.8e\n", et.bvalue()[0]);
+    // for (int i = 0; i < 3; i++) {
+    //   printf("dd0[%d] %.8e\n", i, d0.bvalue().get_data()[i]);
+    // }
+    // for (int j = 0; j < 6; j++) {
+    //   printf("dd0xi[%d] %.8e\n", j, d0xi.bvalue()[j]);
+    //   printf("du0xi[%d] %.8e\n", j, u0xi.bvalue()[j]);
+    // }
+    // for (int k = 0; k < 6; k++) {
+    //   printf("de0ty[%d] %.8e\n", k, e0ty.bvalue().get_data()[k]);
+    //   printf("dgty[%d] %.8e\n", k, gty.bvalue().get_data()[k]);
+    // }
+    
     // reverse through the basis back to the director class, drill strain, tying strain
     basis::template addInterpFieldsTranspose<1, 1>(pt, et.bvalue().get_data(), detn);
     basis::template addInterpFieldsTranspose<3, 3>(pt, d0.bvalue().get_data(), dd);
@@ -748,30 +801,13 @@ void TACSShellElement<quadrature, basis, director, model>::addJacobian(
 
     basis::addInterpTyingStrainTranspose(pt, gty.bvalue().get_data(), dety);
 
-    // reverse mode 2nd order AD for the strain energy stack
-    // -----------------------------------------------------
-
-    // d0, d0xi, u0xi, et, gty
-    const int ncomp = 22;
-    A2D::SymMat<TacsScalar, ncomp> hess;
-    auto in = A2D::MakeTieTuple<TacsScalar, A2D::ADseed::p>(d0, d0xi, u0xi, gty, et);
-    auto out = A2D::MakeTieTuple<TacsScalar, A2D::ADseed::h>(d0, d0xi, u0xi, gty, et);
-    strain_energy_stack.hextract(in, out, hess);
-
-    // create submatrix Hessian matrices
-    A2D::Mat<TacsScalar,1,1> d2et;
-    A2D::Mat<TacsScalar, 3, 3> d2d0;
-    A2D::Mat<TacsScalar, 3, 6> d2d0d0xi, d2d0u0xi;
-    A2D::Mat<TacsScalar, 6, 3> d2gtyd0;
-    A2D::Mat<TacsScalar, 6, 6> d2d0xi, d2d0xiu0xi, d2u0xi, d2gty, d2gtyd0xi, d2gtyu0xi;
-
     // copy values from full hessian into submatrix-Hessians
     // could add A2D routines to extract submatrices in the future using upper, lower bounds maybe?
     for (int irow = 0; irow < 22; irow++) {
       for (int icol = 0; icol < 22; icol++) {
         // start of large irow if block
-        if (0 <= irow && irow < 3) { // d0 rows
-          if (0 <= icol && icol < 3) { // d0 cols
+        if (irow < 3) { // d0 rows
+          if (icol < 3) { // d0 cols
             d2d0(irow, icol) = hess(irow,icol);
           } else if (3 <= icol && icol < 9) { // d0xi cols
             d2d0d0xi(irow, icol-3) = hess(irow,icol);
@@ -795,13 +831,53 @@ void TACSShellElement<quadrature, basis, director, model>::addJacobian(
             d2gtyd0xi(irow-15, icol-3) = hess(irow,icol);
           } else if (9 <= icol && icol < 15) { // u0xi cols
             d2gtyu0xi(irow-15, icol-9) = hess(irow,icol);
-          } else if (15 <= icol && icol < 22) { // gty cols
+          } else if (15 <= icol && icol < 21) { // gty cols
             d2gty(irow-15, icol-15) = hess(irow, icol);
           }
         } // done with large irow if block 
       } // end of icol for loop
     } // end of icol for loop
     d2et(0,0) = hess(21, 21);
+
+    // debug compare the 2nd derivatives with orig shell element via printout
+    // in main addJacobian of orig
+    printf("d2et = %.8e\n", d2et.get_data()[0]);
+
+    // in TacsShellAddDispGradHessian of orig
+    for (int i1 = 0; i1 < 9; i1++) {
+      printf("d2d0[%d] = %.8e\n", i1, d2d0.get_data()[i1]);
+    }
+    for (int i2 = 0; i2 < 18; i2++) {
+      printf("d2d0d0xi[%d] = %.8e\n", i2, d2d0d0xi.get_data()[i2]);
+    }
+    for (int i3 = 0; i3 < 18; i3++) {
+      printf("d2d0u0xi[%d] = %.8e\n", i3, d2d0u0xi.get_data()[i3]);
+    }
+    for (int i5 = 0; i5 < 36; i5++) {
+      printf("d2d0xi[%d] = %.8e\n", i5, d2d0xi.get_data()[i5]);
+    }
+    for (int i6 = 0; i6 < 36; i6++) {
+      printf("d2d0xiu0xi[%d] = %.8e\n", i6, d2d0xiu0xi.get_data()[i6]);
+    }
+    for (int i7 = 0; i7 < 36; i7++) {
+      printf("d2u0xi[%d] = %.8e\n", i7, d2u0xi.get_data()[i7]);
+    }
+
+    // in main addJacobian of orig
+    for (int i8 = 0; i8 < 36; i8++) {
+      printf("d2gty[%d] = %.8e\n", i8, d2gty.get_data()[i8]);
+    }
+
+    // matches TacsShellAddTyingDispCoupling
+    // for (int i4 = 0; i4 < 18; i4++) {
+    //   printf("d2gtyd0[%d] = %.8e\n", i4, d2gtyd0.get_data()[i4]);
+    // }
+    // for (int i9 = 0; i9 < 36; i9++) {
+    //   printf("d2gtyd0xi[%d] = %.8e\n", i9, d2gtyd0xi.get_data()[i9]);
+    // }
+    // for (int i10 = 0; i10 < 36; i10++) {
+    //   printf("d2gtyu0xi[%d] = %.8e\n", i10, d2gtyu0xi.get_data()[i10]);
+    // }
 
     // Hessian backprop from quad level to nodes level
     basis::template addInterpFieldsOuterProduct<1, 1, 1, 1>(pt, d2et.get_data(), d2etn);
@@ -814,6 +890,8 @@ void TACSShellElement<quadrature, basis, director, model>::addJacobian(
       basis::template addInterpGradOuterProduct<vars_per_node, vars_per_node, 3, 3>(pt, d2u0xi.get_data(), mat);
     }
     basis::addInterpTyingStrainHessian(pt, d2gty.get_data(), d2ety);  
+
+    // double check this new routine.. => not sure if this part is right..
     TacsShellAddTyingDispCouplingPostStack<basis>(pt, 
       d2gtyd0.get_data(), d2gtyd0xi.get_data(), d2gtyu0xi.get_data(), 
       d2etyu, d2etyd);
@@ -897,6 +975,14 @@ void TACSShellElement<quadrature, basis, director, model>::addJacobian(
   director::template addRotationConstrJacobian<vars_per_node, offset,
                                                num_nodes>(alpha, vars, res,
                                                           mat);
+
+  // check the values in the matrix (compare for debug) 
+  int index = 0;
+  for (int irow = 0; irow < 24; irow++) {
+    for (int icol = 0; icol < 24; icol++, ++index) {
+      printf("Kelem[%d,%d] = %.8e\n", irow, icol, mat[index]);
+    }
+  }
 
   // printf("Done with addJacobian on elem %d\n", elemIndex);
 }

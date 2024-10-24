@@ -252,7 +252,7 @@ void TACSIsoShellConstitutive::getABDmatrix(int elemIndex, const double pt[], co
           // copy the As transverse shear matrix
           ABD[9 * irow + icol] = As[0];
         } else if (irow == 8 && icol == 8) {
-          printf("put drill = %.8e in loc %d\n", drill, 9 * irow + icol);
+          // printf("put drill = %.8e in loc %d\n", drill, 9 * irow + icol);
           ABD[9 * irow + icol] = drill;
         }
       }

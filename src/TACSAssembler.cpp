@@ -4143,7 +4143,7 @@ void TACSAssembler::assembleJacobian(TacsScalar alpha, TacsScalar beta,
       // debug set vars to nonzero
       for (int i1 = 0; i1 < 24; i1++) {
         vars[i1] = static_cast<float>(rand()) / static_cast<float>(RAND_MAX);
-        printf("vars[%d] = %.8e\n", i1, vars[i1]);
+        // printf("vars[%d] = %.8e\n", i1, vars[i1]);
       }
 
       // Compute and add the contributions to the Jacobian
@@ -4151,6 +4151,9 @@ void TACSAssembler::assembleJacobian(TacsScalar alpha, TacsScalar beta,
       memset(elemMat, 0, nvars * nvars * sizeof(TacsScalar));
       elements[i]->addJacobian(i, time, alpha, beta, gamma, elemXpts, vars,
                                dvars, ddvars, elemRes, elemMat);
+
+      // end debug
+      exit(0);
 
       if (residual) {
         residual->setValues(len, nodes, elemRes, TACS_ADD_VALUES);

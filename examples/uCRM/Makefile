@@ -23,8 +23,17 @@ complex_debug: debug
 
 
 new:
-	$(MAKE) clean
-	$(MAKE) debug
+	rm *.txt || echo "no files to remove"
+	make clean
+	make
+
+run:
+	./runcrm.x >> new.txt
+	./runcrm_orig.x >> orig.txt
+
+newrun:
+	make new
+	make run
 
 clean:
 	rm -f *.o

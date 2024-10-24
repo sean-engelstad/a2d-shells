@@ -20,7 +20,9 @@ int main(int argc, char *argv[]) {
     TacsScalar tacsKDF[NRUNS] = { };
     double E = 70e9; // 70e3
     double conv_eigval = 0.3;
+    double conv_slope_frac = 0.1;
     double temperature = 1.0; // maybe should be list?
+    bool ringStiffened = false; double ringStiffenedRadiusFrac = 0.9;
 
     double t = 0.002;
     double Lr = 2.0;
@@ -29,7 +31,7 @@ int main(int argc, char *argv[]) {
     // for debugging
     // TacsScalar imperfections[NUM_IMP] = {0.0 * t, 0.0, 0.0 };
     TacsScalar imperfections[NUM_IMP] = {0.5 * t, 0.0, 0.0 };
-    bool useEigvals = true; // if false uses load-disp curve
+    bool useEigvals = false; // use load-disp curve for thermal buckling
 
     FILE *fp;
     if (rank == 0) {
@@ -51,7 +53,9 @@ int main(int argc, char *argv[]) {
             // int nelems = meshSizes[irun]; // 5000, 10000
             int nelems = meshSizes[inelems];
             getNonlinearBucklingKDF(
-                comm, irun, filePrefix, t, rt, Lr, E, conv_eigval, temperature,
+                comm, irun, filePrefix, t, rt, Lr, E, temperature,
+                ringStiffened, ringStiffenedRadiusFrac,
+                conv_eigval, conv_slope_frac,
                 NUM_IMP, &imperfections[0],
                 useEigvals, nelems, &nasaKDF[i_rt], &tacsKDF[i_rt]
             );

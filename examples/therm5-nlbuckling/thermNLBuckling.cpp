@@ -18,18 +18,24 @@ int main(int argc, char *argv[]) {
     double temperature = 1.0; // K (may have to adjust depending on the)
     double E = 70e5; // 70e9 // can scale the problem (won't affect disps)
     double conv_eigval = 0.3; // 0.01, 0.1
+    double conv_slope_frac = 0.1;
     // worried that if I scale down too much, won't solve as deeply though.
 
     // for debugging
     // TacsScalar imperfections[NUM_IMP] = {0.0 * t, 0.0, 0.0 };
-    TacsScalar imperfections[NUM_IMP] = {0.5 * t, 0.0, 0.0 };
-    bool useEigvals = true;
+    // TacsScalar imperfections[NUM_IMP] = {0.5 * t, 0.0, 0.0 };
+    TacsScalar imperfections[NUM_IMP] = {0.0, 0.0, 0.5 * t };
+    bool useEigvals = false; // use load-disp curve for thermal
     int nelems = 20000;
     std::string filePrefix = "";
     TacsScalar nasaKDF, tacsKDF;
+    bool ringStiffened = false;
+    double ringStiffenedRadiusFrac = 0.9;
 
     getNonlinearBucklingKDF(
-        comm, 1, filePrefix, t, rt, Lr, E, conv_eigval, temperature, 
+        comm, 1, filePrefix, t, rt, Lr, E, temperature, 
+        conv_eigval, conv_slope_frac,
+        ringStiffened, ringStiffenedRadiusFrac,
         NUM_IMP, &imperfections[0],
         useEigvals, nelems, &nasaKDF, &tacsKDF
     );

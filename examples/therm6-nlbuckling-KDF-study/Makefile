@@ -24,8 +24,8 @@ new:
 	$(MAKE) debug
 
 clean:
-	rm -f *.o
-	rm -f *.x
+	rm -f *.o || echo "Missing .o files"
+	rm -f *.x || echo "Missing .x files"
 
 cleanf5:
 	rm -f **/*.f5

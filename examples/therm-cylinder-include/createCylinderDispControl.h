@@ -11,7 +11,8 @@
   creator object
 */
 void createAssembler(MPI_Comm comm, int order, int nx, int ny, TacsScalar udisp,
-                     TacsScalar length, TacsScalar radius,
+                     TacsScalar length, TacsScalar radius, 
+                     bool ringStiffened, double ringStiffenedRadiusFrac,
                      TACSElement *element, TACSAssembler **_assembler,
                      TACSCreator **_creator) {
   int rank;
@@ -69,49 +70,127 @@ void createAssembler(MPI_Comm comm, int order, int nx, int ny, TacsScalar udisp,
     delete[] ptr;
     delete[] ids;
 
-    int numBcs = 2 * nny;
-    int *bcNodes = new int[numBcs];
+    int numBcs;
+    int *bcNodes, *bc_ptr, *bc_vars;
+    TacsScalar *bc_vals;
     int k = 0;
+    
+    if (!ringStiffened) {
+      numBcs = 2 * nny;
+      bcNodes = new int[numBcs];
+      bc_ptr = new int[numBcs + 1];
+      bc_vars = new int[3 * numBcs];
+      bc_vals = new TacsScalar[3 * numBcs];
 
-    int *bc_ptr = new int[numBcs + 1];
-    int *bc_vars = new int[3 * numBcs];
-    TacsScalar *bc_vals = new TacsScalar[3 * numBcs];
-    bc_ptr[0] = 0;
-    int i = 0; // BC counter
+      // iterate over the bc nodes and values into the bc arrays
+      bc_ptr[0] = 0;
+      int i = 0; // BC counter
 
-    // previously had u, v, w, rotx but that doesn't bode well for the buckling problem
-    // maybe should only constrain rotation at like 1 point or so
-    // if do want rotx constrained, then you should set 4 * numBCs instead of 3 * numBCs above and loop to m < 4
-    for (int j = 0; j < nny; j++) { // set u, v, w, xrot to zero
-      // bc at x- edge
-      bc_ptr[i+1] = bc_ptr[i]; // start BC dof counter
-      int node = j * nnx;
-      bcNodes[k] = node;
-      for (int m = 0; m < 3; m++) {
-        bc_vars[bc_ptr[i+1]] = m; // DOF m is set to 0 disp
-        bc_vals[bc_ptr[i+1]] = 0.0;
-        bc_ptr[i+1]++;
-        // printf("x- node %d with DOF %d set to %.2e with total BCs %d\n", node, m, bc_vals[bc_ptr[i+1]-1], bc_ptr[i+1]);
-      }
-      k++; i++;
-
-      bc_ptr[i+1] = bc_ptr[i]; // start BC dof counter
-      node = nnx - 1 + j * nnx;
-      bcNodes[k] = node;
-      for (int m = 0; m < 3; m++) { // set x = udisp and y,z,rotx to 0
-        bc_vars[bc_ptr[i+1]] = m; // DOF m is set to 0 disp
-        TacsScalar disp;
-        if (m == 0) {
-            disp = udisp;
-        } else {
-            disp = 0.0;
+      // previously had u, v, w, rotx but that doesn't bode well for the buckling problem
+      // maybe should only constrain rotation at like 1 point or so
+      // if do want rotx constrained, then you should set 4 * numBCs instead of 3 * numBCs above and loop to m < 4
+      for (int j = 0; j < nny; j++) { // set u, v, w, xrot to zero
+        // bc at x- edge
+        bc_ptr[i+1] = bc_ptr[i]; // start BC dof counter
+        int node = j * nnx;
+        bcNodes[k] = node;
+        for (int m = 0; m < 3; m++) {
+          bc_vars[bc_ptr[i+1]] = m; // DOF m is set to 0 disp
+          bc_vals[bc_ptr[i+1]] = 0.0;
+          bc_ptr[i+1]++;
+          // printf("x- node %d with DOF %d set to %.2e with total BCs %d\n", node, m, bc_vals[bc_ptr[i+1]-1], bc_ptr[i+1]);
         }
-        bc_vals[bc_ptr[i+1]] = disp;
-        bc_ptr[i+1]++;
-        // printf("x+ node %d with DOF %d set to %.2e with total BCs %d\n", node, m, bc_vals[bc_ptr[i+1]-1], bc_ptr[i+1]);
+        k++; i++;
+
+        bc_ptr[i+1] = bc_ptr[i]; // start BC dof counter
+        node = nnx - 1 + j * nnx;
+        bcNodes[k] = node;
+        for (int m = 0; m < 3; m++) { // set x = udisp and y,z,rotx to 0
+          bc_vars[bc_ptr[i+1]] = m; // DOF m is set to 0 disp
+          TacsScalar disp;
+          if (m == 0) {
+              disp = udisp;
+          } else {
+              disp = 0.0;
+          }
+          bc_vals[bc_ptr[i+1]] = disp;
+          bc_ptr[i+1]++;
+          // printf("x+ node %d with DOF %d set to %.2e with total BCs %d\n", node, m, bc_vals[bc_ptr[i+1]-1], bc_ptr[i+1]);
+        }
+        k++; i++;
       }
-      k++; i++;
-    }
+    // end of if (!ringStiffened) section
+    } else if (ringStiffened) {
+
+      numBcs = 8 * nny; // total number of nodes w/ BCs specified
+      bcNodes = new int[numBcs];
+      bc_ptr = new int[numBcs + 1];
+      int numDOF_cons = 12 * nny; // length - total # of dof constraints among all nodes
+      bc_vars = new int[numDOF_cons]; 
+      bc_vals = new TacsScalar[numDOF_cons]; // length - total # of dof constraints among all nodes
+
+      // iterate over the bc nodes and values into the bc arrays
+      bc_ptr[0] = 0;
+      int i = 0; // BC counter
+
+      // previously had u, v, w, rotx but that doesn't bode well for the buckling problem
+      // maybe should only constrain rotation at like 1 point or so
+      // if do want rotx constrained, then you should set 4 * numBCs instead of 3 * numBCs above and loop to m < 4
+      for (int j = 0; j < nny; j++) { // set u, v, w, xrot to zero
+        // bc at x- edge
+        bc_ptr[i+1] = bc_ptr[i]; // start BC dof counter
+        int node = j * nnx;
+        bcNodes[k] = node;
+        for (int m = 0; m < 3; m++) {
+          bc_vars[bc_ptr[i+1]] = m; // DOF m is set to 0 disp
+          bc_vals[bc_ptr[i+1]] = 0.0;
+          bc_ptr[i+1]++;
+          // printf("x- node %d with DOF %d set to %.2e with total BCs %d\n", node, m, bc_vals[bc_ptr[i+1]-1], bc_ptr[i+1]);
+        }
+        k++; i++;
+
+        // bc of x- edge inner ring (set u1 = 0)
+        for (int iring = 0; iring < 3; iring++) {
+          bc_ptr[i+1] = bc_ptr[i]; // start BC dof counter
+          int node = j * nnx + iring + 1;
+          bcNodes[k] = node;
+          bc_vars[bc_ptr[i+1]] = 0; // DOF m is set to 0 disp
+          bc_vals[bc_ptr[i+1]] = 0.0;
+          bc_ptr[i+1]++;
+          k++; i++;
+        }
+
+        // bc of x+ edge inner ring (set u1 = 0)
+        for (int iring = 0; iring < 3; iring++) {
+          bc_ptr[i+1] = bc_ptr[i]; // start BC dof counter
+          int node = nnx - 1 + j * nnx - (iring+1);
+          bcNodes[k] = node;
+          bc_vars[bc_ptr[i+1]] = 0; // DOF m is set to 0 disp
+          bc_vals[bc_ptr[i+1]] = 0.0;
+          bc_ptr[i+1]++;
+          k++; i++;
+        }
+
+        bc_ptr[i+1] = bc_ptr[i]; // start BC dof counter
+        node = nnx - 1 + j * nnx;
+        bcNodes[k] = node;
+        for (int m = 0; m < 3; m++) { // set x = udisp and y,z,rotx to 0
+          bc_vars[bc_ptr[i+1]] = m; // DOF m is set to 0 disp
+          TacsScalar disp;
+          if (m == 0) {
+              disp = udisp;
+          } else {
+              disp = 0.0;
+          }
+          bc_vals[bc_ptr[i+1]] = disp;
+          bc_ptr[i+1]++;
+          // printf("x+ node %d with DOF %d set to %.2e with total BCs %d\n", node, m, bc_vals[bc_ptr[i+1]-1], bc_ptr[i+1]);
+        }
+        k++; i++;
+      }
+    } // end of if ringStiffened
+    
+    
     // printf("udisp = %.8f", udisp);
 
     // Set the boundary conditions
@@ -128,17 +207,41 @@ void createAssembler(MPI_Comm comm, int order, int nx, int ny, TacsScalar udisp,
     for (int j = 0; j < nny; j++) {
       double v = -M_PI + (2.0 * M_PI * j) / nny;
       for (int i = 0; i < nnx; i++) {
-        double u = 1.0 * i / (nnx - 1);
-        // double theta =
-        //     v + 0.25 * M_PI * u + defect * sin(v) * cos(2 * M_PI * u);
-        // double x = L * (u + defect * cos(v) * sin(2 * M_PI * u));
         double theta = v;
-        double x = L*u;
+        double x, y, z;
+        double cradius;
+
+        if (i < 4 && ringStiffened) {
+          // front ring stiffener
+          x = 0;
+          cradius = R * (ringStiffenedRadiusFrac + (1.0-ringStiffenedRadiusFrac) * i / 3);
+          y = cradius * cos(theta);
+          z = -cradius * sin(theta);
+
+        } else if (i >= (nnx - 4) && ringStiffened) {
+          // back ring stiffener
+          x = L;
+          cradius = R * (1.0 - (1.0-ringStiffenedRadiusFrac) * (i - nnx + 4) / 3);
+          y = cradius * cos(theta);
+          z = -cradius * sin(theta);
+        } else if ( (3 <= i && i < nnx - 3) || !ringStiffened) {
+          // middle section
+          double u;
+          if (ringStiffened) {
+            u = 1.0 * (i - 3) / (nnx - 7);
+          } else {
+            u = 1.0 * i / (nnx - 1);
+          }
+          x = L*u;
+          y = R * cos(theta);
+          z = -R * sin(theta); 
+        }
 
         int node = i + j * nnx;
         Xpts[3 * node] = x;
-        Xpts[3 * node + 1] = R * cos(theta);
-        Xpts[3 * node + 2] = -R * sin(theta);
+        Xpts[3 * node + 1] = y;
+        Xpts[3 * node + 2] = z;
+
       }
     }
 

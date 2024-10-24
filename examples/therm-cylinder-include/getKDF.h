@@ -11,10 +11,11 @@
 void getNonlinearBucklingKDF(MPI_Comm comm, int run, 
     std::string filePrefix,
     double t, double rt, double Lr, 
-    double E, double conv_eigval, double temperature,
+    double E, double temperature,
+    double conv_eigval, double conv_slope_frac,
+    bool ringStiffened, double ringStiffenedRadiusFrac,
     int num_imperfections, TacsScalar *imperfection_sizes,
-    bool useEigvals,
-    int nelems,
+    bool useEigvals, int nelems,
     TacsScalar *nasaKDF, TacsScalar *tacsKDF
     ) {
 
@@ -56,7 +57,9 @@ void getNonlinearBucklingKDF(MPI_Comm comm, int run,
     // needs to be nonlinear here otherwise solve will terminate immediately
     shell = new TACSQuad4NonlinearShell(transform, con); 
     shell->incref();
-    createAssembler(comm, 2, nx, ny, udisp, L, R, shell, &assembler, &creator);
+    createAssembler(comm, 2, nx, ny, udisp, L, R, 
+    ringStiffened, ringStiffenedRadiusFrac,
+    shell, &assembler, &creator);
     
     // set the temperatures into the structure
     // TacsScalar temperature = 1.0;
@@ -248,7 +251,7 @@ void getNonlinearBucklingKDF(MPI_Comm comm, int run,
         const char *cstr_file2 = file2.c_str();
         fp2 = fopen(cstr_file2, "w");
         if (fp2) {
-            fprintf(fp2, "iter,|u|,lambda,minS11,avgS11,maxS11\n");
+            fprintf(fp2, "iter,|u|,lambda,minS11,avgS11,maxS11,avgSlopeFrac\n");
             fflush(fp2);
         }
     }
@@ -531,21 +534,19 @@ void getNonlinearBucklingKDF(MPI_Comm comm, int run,
 
         // TODO : adding slope check
         if (iarclength == 0 && !useEigvals) {
-            init_slope = (avg_stress);
+            init_slope = avg_stress / lambda;
+        } else if (!useEigvals) {
+            c_slope = (avg_stress - avg_stress_old) / (lambda - lambda_old);
         }
 
-        // check for buckling in load-disp curve
-        if (max_stress < max_stress_old || avg_stress < avg_stress_old && !useEigvals) {
-            // buckling
-            nonlinear_eigval = lambda;
-            break;
-        }
+        // save old avg stress for next time
+        avg_stress_old = avg_stress;
 
         // update load-displacement curve output file
         if (fp2) {
-            // iter, |u|, lambda, minS11, avgS11, maxS11
-            fprintf(fp2, "%2d,%15.6e,%15.6e,%15.6e,%15.6e,%15.6e\n", iarclength+1, TacsRealPart(vars->norm()), TacsRealPart(lambda),
-            TacsRealPart(min_stress), TacsRealPart(avg_stress), TacsRealPart(max_stress));
+            // iter, |u|, lambda, minS11, avgS11, maxS11, avgSlopeFrac
+            fprintf(fp2, "%2d,%15.6e,%15.6e,%15.6e,%15.6e,%15.6e,%15.6e\n", iarclength+1, TacsRealPart(vars->norm()), TacsRealPart(lambda),
+            TacsRealPart(min_stress), TacsRealPart(avg_stress), TacsRealPart(max_stress), TacsRealPart(c_slope / init_slope));
             fflush(fp2);
         }
 
@@ -561,12 +562,20 @@ void getNonlinearBucklingKDF(MPI_Comm comm, int run,
         const char *cstr_filename = filename.c_str();
         f5->writeToFile(cstr_filename);
 
+        // eigenvalue based stopping criterion
         if (iarclength % num_arclength_per_lbuckle == 0 && iarclength != 0 && useEigvals) {
             printf("eigval = %.8e\n", eigval);
             if (TacsRealPart(eigval) < conv_eigval || TacsRealPart(loc_error) > 1e-1 || std::isnan(TacsRealPart(loc_error))) {
                 nonlinear_eigval = lambda;
                 break; // break out of the arc length loop and we are done with nonlinear buckling!
             }
+        }
+
+        // load-disp curve stopping criterion
+        if (TacsRealPart(c_slope / init_slope) < conv_slope_frac && !useEigvals) {
+            // buckling
+            nonlinear_eigval = lambda;
+            break;
         }
 
     } // end of outer arc length steps for loop

@@ -146,6 +146,19 @@ void getNonlinearBucklingKDF(MPI_Comm comm, int run,
     // solve the buckling analysis
     buckling->setSigma(10.0);
     buckling->solve(NULL, NULL, ksm_print_buckling);
+
+    // compute linear eigval based on initial thermal buckling estimate
+    TacsScalar error;
+    TacsScalar linear_eigval = buckling->extractEigenvalue(0, &error);
+
+    // then adjust init temperature so that the linear eigenvalue will be ~200
+    temperature *= linear_eigval / 200.0;
+    assembler->setTemperatures(temperature);
+
+    // now run and get new linear eigval and then use this for imperfections
+    buckling->solve(NULL, NULL, ksm_print_buckling);
+    linear_eigval = buckling->extractEigenvalue(0, &error);
+
     
     // write principal eigenmode
     std::string fileL = filePrefix + "lin_buckle" + std::to_string(run) + ".f5";
@@ -169,9 +182,7 @@ void getNonlinearBucklingKDF(MPI_Comm comm, int run,
     assembler->getNodes(xpts);
     phi->incref();
     xpts->incref();
-    phi_uvw->incref();
-    TacsScalar error;
-    TacsScalar linear_eigval = buckling->extractEigenvalue(0, &error);
+    phi_uvw->incref();    
     for (int imode = 0; imode < num_imperfections; imode++) {
         buckling->extractEigenvector(imode, phi, &error);
 
@@ -286,6 +297,7 @@ void getNonlinearBucklingKDF(MPI_Comm comm, int run,
     TacsScalar min_stress, min_stress_old = -1.0e40; // the abs min stresses, etc.
     TacsScalar avg_stress, avg_stress_old = -1.0e40;
     TacsScalar *tempStresses = new TacsScalar[9];
+    TacsScalar init_slope, c_slope;
 
     double t0 = MPI_Wtime();
     if (ksm_print) {
@@ -472,6 +484,10 @@ void getNonlinearBucklingKDF(MPI_Comm comm, int run,
             delta_vars->copyValues(vars);
             delta_vars->axpy(-1.0, old_vars); // delta_u(s) = u(s+ds) - u(s) [change in vars along load path for two equilib points]
             buckling->setSigma(1.0);
+
+            // tell Abaqus the temp change on the path
+            assembler->setTemperaturePaths((lambda - lambda_old) * temperature);
+
             // option 1 - finds K_t(u) + lambda * |du| * d/ds K_t(u + s * du / |du|) 
             //     but then if |du| is much smaller than |u|, the lambda does not predict multiples on original lambda correctly
             buckling->solve_local(NULL, vars, ksm_print_buckling, delta_vars);
@@ -512,6 +528,11 @@ void getNonlinearBucklingKDF(MPI_Comm comm, int run,
 
         assembler->getAverageStresses(etype, &tempStresses[0], 0);
         avg_stress = abs(TacsRealPart(tempStresses[0]));
+
+        // TODO : adding slope check
+        if (iarclength == 0 && !useEigvals) {
+            init_slope = (avg_stress);
+        }
 
         // check for buckling in load-disp curve
         if (max_stress < max_stress_old || avg_stress < avg_stress_old && !useEigvals) {

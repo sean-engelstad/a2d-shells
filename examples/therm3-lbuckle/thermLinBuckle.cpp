@@ -28,7 +28,7 @@ int main(int argc, char *argv[]) {
 
     double t = 0.002; // m 
     double Lr = 2.0; // default 2.0
-    double rt = 10; // 100, 50, 25
+    double rt = 100; // 100, 50, 25
     double R = t * rt; // m
     double L = R * Lr;
 
@@ -37,7 +37,7 @@ int main(int argc, char *argv[]) {
     // select nelems and it will select to retain isotropic elements (good element AR)
     // want dy = 2 * pi * R / ny the hoop elem spacing to be equal dx = L / nx the axial elem spacing
     // and want to choose # elems so that elements have good elem AR
-    int nelems = 10000; // prev 3500 // target (does round stuff)
+    int nelems = 20000; // prev 3500 // target (does round stuff)
     double pi = 3.14159265;
     double A = L / 2.0 / pi / R;
     double temp1 = sqrt(nelems * 1.0 / A);
@@ -51,7 +51,7 @@ int main(int argc, char *argv[]) {
     TacsScalar E = 70e3; // 70e9
     TacsScalar nu = 0.3;
     TacsScalar ys = 270.0;
-    TacsScalar cte = 24.0e-6;
+    TacsScalar cte = 23.5e-6;
     TacsScalar kappa = 230.0;
     TACSMaterialProperties *props = new TACSMaterialProperties(rho, specific_heat, E, nu, ys, cte, kappa);
 
@@ -164,8 +164,8 @@ int main(int argc, char *argv[]) {
     lbuckle_gmres->setTolerances(1e-12, 1e-12);
 
     // make the buckling solver
-    TacsScalar sigma = 0.1; // need high enough num_eigvals to get it right
-    int max_lanczos_vecs = 300, num_eigvals = 50; // num_eigvals = 50;
+    TacsScalar sigma = 5.0; // need high enough num_eigvals to get it right
+    int max_lanczos_vecs = 500, num_eigvals = 100; // num_eigvals = 50;
     double eig_tol = 1e-12;
 
     TACSLinearBuckling *buckling = new TACSLinearBuckling(assembler, sigma,
@@ -177,7 +177,7 @@ int main(int argc, char *argv[]) {
     ksm_print->incref();
 
     // solve the buckling analysis
-    buckling->setSigma(0.1);
+    buckling->setSigma(10.0);
     buckling->solve(NULL, NULL, ksm_print_buckling);
     // exit(0);
 

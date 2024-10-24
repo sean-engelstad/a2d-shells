@@ -806,6 +806,7 @@ class TACSElement : public TACSObject {
                              TacsScalar *data) {}
 
   virtual void setTemperature(TacsScalar _temp) {}
+  virtual void setTemperaturePath(TacsScalar _temp) {}
   virtual TacsScalar getTemperature() { return 0.0; }
 
  private:

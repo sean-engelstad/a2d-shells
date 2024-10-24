@@ -25,10 +25,6 @@ void createAssembler(MPI_Comm comm, int order, int nx, int ny, TacsScalar udisp,
   MPI_Comm_rank(comm, &rank);
   double defect = 0.1;
 
-  // Set the alpha and beta parameters
-  double alpha = 4.0 / R;
-  double beta = 3 * M_PI / L;
-
   // Set the number of nodes/elements on this proc
   int varsPerNode = element->getVarsPerNode();
 
@@ -204,7 +200,7 @@ int main(int argc, char *argv[]) {
   // select nelems and it will select to retain isotropic elements (good element AR)
   // want dy = 2 * pi * R / ny the hoop elem spacing to be equal dx = L / nx the axial elem spacing
   // and want to choose # elems so that elements have good elem AR
-  int nelems = 5000; // prev 3500 // target (does round stuff)
+  int nelems = 20000; // prev 3500 // target (does round stuff)
   double pi = 3.14159265;
   double A = L / 2.0 / pi / R;
   double temp1 = sqrt(nelems * 1.0 / A);
@@ -218,7 +214,7 @@ int main(int argc, char *argv[]) {
   TacsScalar E = 70e9;
   TacsScalar nu = 0.3;
   TacsScalar ys = 270.0;
-  TacsScalar cte = 24.0e-6;
+  TacsScalar cte = 23.5e-6;
   TacsScalar kappa = 230.0;
   TACSMaterialProperties *props =
       new TACSMaterialProperties(rho, specific_heat, E, nu, ys, cte, kappa);
@@ -259,7 +255,7 @@ int main(int argc, char *argv[]) {
   TACSSchurPc *pc = new TACSSchurPc(mat, lev, fill, reorder_schur);
   pc->incref();
 
-  assembler->setTemperatures(10.0); // 10 K
+  assembler->setTemperatures(100.0); // 10 K
 
   // apply displacement control BCs to the residual
   assembler->applyBCs(res);

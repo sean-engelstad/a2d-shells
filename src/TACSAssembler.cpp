@@ -3864,6 +3864,12 @@ void TACSAssembler::setTemperatures(TacsScalar temp) {
   }
 }
 
+void TACSAssembler::setTemperaturePaths(TacsScalar temp) {
+  for (int i = 0; i < numElements; i++) {
+        elements[i]->setTemperaturePath(temp);
+  }
+}
+
 /**
   Copy the values directly without distributing them.
 

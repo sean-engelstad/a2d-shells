@@ -34,6 +34,7 @@ class TACSShellElement : public TACSElement {
 
   bool complexStepGmatrix = false;
   TacsScalar temperature = 0.0;
+  TacsScalar *tempPath = NULL;
 
   TACSShellElement(TACSShellTransform *_transform,
                    TACSShellConstitutive *_con) {
@@ -75,6 +76,7 @@ class TACSShellElement : public TACSElement {
   int getVarsPerNode() { return vars_per_node; }
   int getNumNodes() { return num_nodes; }
   void setTemperature(TacsScalar _temp) {temperature = _temp;}
+  void setTemperaturePath(TacsScalar *_temp) {tempPath = _temp;}
   TacsScalar getTemperature() { return temperature; }
 
   ElementLayout getLayoutType() { return basis::getLayoutType(); }
@@ -731,6 +733,12 @@ void TACSShellElement<quadrature, basis, director, model>::getMatType(
     }
 
     TacsScalar temp_orig = temperature; // for NL element which we need to change in place
+    TacsScalar dtemp;
+    if (tempPath) {
+      dtemp = *tempPath;
+    } else {
+      dtemp = temperature;
+    }
 
     // compute norm for normalizing path vec
     norm = 0.0;
@@ -739,7 +747,7 @@ void TACSShellElement<quadrature, basis, director, model>::getMatType(
     }
 
     // include thermal path in norm
-    norm += temp_orig * temp_orig;
+    norm += dtemp * dtemp;
 
     
     if (TacsRealPart(norm) == 0.0) {
@@ -748,9 +756,9 @@ void TACSShellElement<quadrature, basis, director, model>::getMatType(
     } else {
       norm = sqrt(norm);
       // printf("norm = %.8e\n", norm);
-      for (int i = 0; i < 24; i++) {
-        // printf("delta_vars[%d] = %.8e\n", i, delta_vars[i]);
-      }
+      // for (int i = 0; i < 24; i++) {
+      //   // printf("delta_vars[%d] = %.8e\n", i, delta_vars[i]);
+      // }
     }
     // printf("norm = %.8e\n", norm);
 
@@ -765,7 +773,7 @@ void TACSShellElement<quadrature, basis, director, model>::getMatType(
 
     // temperature perturbation as well (for thermal buckling)
     TacsScalar my_dh = dh_mag;
-    nlElem->setTemperature(temp_orig + my_dh * temp_orig / norm);
+    nlElem->setTemperature(temp_orig + my_dh * dtemp / norm);
     // printf("temperature1 = %.8e\n", nlElem->getTemperature());
 
     // compare inputs btw two LIN and NL models (debug)
@@ -788,7 +796,7 @@ void TACSShellElement<quadrature, basis, director, model>::getMatType(
     }
 
     // temperature perturbation as well (for thermal buckling)
-    nlElem->setTemperature(temp_orig - my_dh * temp_orig / norm);
+    nlElem->setTemperature(temp_orig - my_dh * dtemp / norm);
     // printf("temperature2 = %.8e\n", nlElem->getTemperature());
 
     // compare inputs btw two LIN and NL models (debug)

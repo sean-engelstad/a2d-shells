@@ -91,6 +91,7 @@ class TACSAssembler : public TACSObject {
                         const double *_depNodeWeights);
   // void setTemperatures(TACSBVec *temps);
   void setTemperatures(TacsScalar temp);
+  void setTemperaturePaths(TacsScalar temp);
 
   void getAverageStresses(ElementType elem_type, TacsScalar *avgStresses, int compNum);
   void getMaxStresses(ElementType elem_type, TacsScalar *maxStresses, int compNum);

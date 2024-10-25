@@ -11,7 +11,7 @@
   creator object
 */
 void createAssembler(MPI_Comm comm, int order, int nx, int ny, TacsScalar udisp,
-                     TacsScalar length, TacsScalar radius, 
+                     double length, double radius, 
                      bool ringStiffened, double ringStiffenedRadiusFrac,
                      TACSElement *element, TACSAssembler **_assembler,
                      TACSCreator **_creator) {

@@ -1383,7 +1383,7 @@ void TACSShellElement<quadrature, basis, director, model>::
 }
 
 /*
-  Get the element data for the basis
+  Get the element data for the basis (gets mechanical stresses)
 */
 template <class quadrature, class basis, class director, class model>
 void TACSShellElement<quadrature, basis, director, model>::getAverageStresses(
@@ -1456,9 +1456,21 @@ void TACSShellElement<quadrature, basis, director, model>::getAverageStresses(
       model::evalStrain(u0x, u1x, e0ty, e);
       e[8] = et;
 
+      // add in thermal strains
+      // add thermal strain from prescribed temperature field
+      TacsScalar eth[9];
+      TacsScalar temp = temperature * 1.0;
+      con->evalThermalStrain(elemIndex, pt, X, temp, eth);
+
+      // Compute the mechanical strain (and stress)
+      TacsScalar em[9];
+      for (int i = 0; i < 9; i++) {
+        em[i] = e[i] - eth[i];
+      }
+
       // Compute the corresponding stresses
       TacsScalar s[9];
-      con->evalStress(elemIndex, pt, X, e, s);
+      con->evalStress(elemIndex, pt, X, em, s);
 
       for (int i = 0; i < 9; i++) {
         loc_avgStresses[i] += s[i];
@@ -1547,19 +1559,30 @@ void TACSShellElement<quadrature, basis, director, model>::getMaxStresses(
       model::evalStrain(u0x, u1x, e0ty, e);
       e[8] = et;
 
+      // add thermal strain from prescribed temperature field
+      TacsScalar eth[9];
+      TacsScalar temp = temperature * 1.0;
+      con->evalThermalStrain(elemIndex, pt, X, temp, eth);
+
+      // Compute the mechanical strain (and stress)
+      TacsScalar em[9];
+      for (int i = 0; i < 9; i++) {
+        em[i] = e[i] - eth[i];
+      }
+
       // Compute the corresponding stresses
       TacsScalar s[9];
-      con->evalStress(elemIndex, pt, X, e, s);
+      con->evalStress(elemIndex, pt, X, em, s);
 
       for (int i = 0; i < 9; i++) {
-        if (abs(TacsRealPart(s[i])) >= loc_maxStresses[i] && abs(TacsRealPart(s[i])) > 1e-10 && !std::isnan(TacsRealPart(s[i]))) {
+        if (abs(TacsRealPart(s[i])) >= abs(TacsRealPart(loc_maxStresses[i])) && abs(TacsRealPart(s[i])) > 1e-10 && !std::isnan(TacsRealPart(s[i]))) {
           loc_maxStresses[i] = abs(TacsRealPart(s[i]));
         }
       }
     }
     // max the max stresses
     for (int i = 0; i < 9; i++) {
-      if (loc_maxStresses[i] >= maxStresses[i]  && abs(TacsRealPart(loc_maxStresses[i])) > 1e-6) {
+      if (abs(TacsRealPart(loc_maxStresses[i])) >= abs(TacsRealPart(maxStresses[i]))  && abs(TacsRealPart(loc_maxStresses[i])) > 1e-6) {
         maxStresses[i] = loc_maxStresses[i];
       }
     }
@@ -1640,19 +1663,30 @@ void TACSShellElement<quadrature, basis, director, model>::getMinStresses(
       model::evalStrain(u0x, u1x, e0ty, e);
       e[8] = et;
 
+      // add thermal strain from prescribed temperature field
+      TacsScalar eth[9];
+      TacsScalar temp = temperature * 1.0;
+      con->evalThermalStrain(elemIndex, pt, X, temp, eth);
+
+      // Compute the mechanical strain (and stress)
+      TacsScalar em[9];
+      for (int i = 0; i < 9; i++) {
+        em[i] = e[i] - eth[i];
+      }
+
       // Compute the corresponding stresses
       TacsScalar s[9];
-      con->evalStress(elemIndex, pt, X, e, s);
+      con->evalStress(elemIndex, pt, X, em, s);
 
       for (int i = 0; i < 9; i++) {
-        if (abs(TacsRealPart(s[i])) <= loc_minStresses[i] && abs(TacsRealPart(s[i])) > 1e-6 && !std::isnan(TacsRealPart(s[i]))) {
+        if (abs(TacsRealPart(s[i])) <= abs(TacsRealPart(loc_minStresses[i])) && abs(TacsRealPart(s[i])) > 1e-6 && !std::isnan(TacsRealPart(s[i]))) {
           loc_minStresses[i] = abs(TacsRealPart(s[i]));
         }
       }
     }
     // max the max stresses
     for (int i = 0; i < 9; i++) {
-      if (loc_minStresses[i] <= minStresses[i] && abs(TacsRealPart(loc_minStresses[i])) > 1e-6) {
+      if (abs(TacsRealPart(loc_minStresses[i])) <= abs(TacsRealPart(minStresses[i])) && abs(TacsRealPart(loc_minStresses[i])) > 1e-6) {
         minStresses[i] = loc_minStresses[i];
       }
     }

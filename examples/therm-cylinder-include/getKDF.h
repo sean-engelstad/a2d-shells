@@ -135,7 +135,7 @@ void getNonlinearBucklingKDF(MPI_Comm comm, int run,
 
     // make the buckling solver
     TacsScalar sigma = 10.0; // need high enough num_eigvals to get it right
-    int max_lanczos_vecs = 300, num_eigvals = 50; // num_eigvals = 50;
+    int max_lanczos_vecs = 300, num_eigvals = 100; // num_eigvals = 50;
     double eig_tol = 1e-12;
 
     TACSLinearBuckling *buckling = new TACSLinearBuckling(assembler, sigma,
@@ -155,7 +155,7 @@ void getNonlinearBucklingKDF(MPI_Comm comm, int run,
     TacsScalar linear_eigval = buckling->extractEigenvalue(0, &error);
 
     // then adjust init temperature so that the linear eigenvalue will be ~200
-    temperature *= linear_eigval / 200.0;
+    temperature *= TacsRealPart(linear_eigval) / 200.0;
     assembler->setTemperatures(temperature);
 
     // now run and get new linear eigval and then use this for imperfections
@@ -169,7 +169,16 @@ void getNonlinearBucklingKDF(MPI_Comm comm, int run,
     TACSBVec *phi = assembler->createVec();
     phi->incref();
     TacsScalar error1;
-    buckling->extractEigenvector(0, phi, &error1);
+    int iphi;
+    double max_imp = 0.0; // get argmax of imperfection sizes
+    for (int i = 0; i < num_imperfections; i++) {
+        if (TacsRealPart(imperfection_sizes[i]) > max_imp) {
+            max_imp = TacsRealPart(imperfection_sizes[i]);
+            iphi = i;
+        }
+    }
+    // temp do 2 for thermal buckling
+    buckling->extractEigenvector(iphi, phi, &error1);
     assembler->setVariables(phi); 
     f5->writeToFile(cstr_fileL);
     // reset setVars
@@ -195,7 +204,7 @@ void getNonlinearBucklingKDF(MPI_Comm comm, int run,
         int varSize = phi->getArray(&phi_x);
         int nodeSize = phi_uvw->getArray(&phi_uvw_x);
         int ixpts = 0;
-        TacsScalar max_uvw = 0.0;
+        double max_uvw = 0.0;
         for (int iphi = 0; iphi < varSize; iphi++) {
             int idof = iphi % 6;
             if (idof > 2) { // skip rotx, roty, rotz components of eigenvector
@@ -203,7 +212,7 @@ void getNonlinearBucklingKDF(MPI_Comm comm, int run,
             }
             phi_uvw_x[ixpts] = phi_x[iphi];
             ixpts++;
-            TacsScalar abs_disp = abs(TacsRealPart(phi_x[iphi]));
+            double abs_disp = abs(TacsRealPart(phi_x[iphi]));
             if (abs_disp > max_uvw) {
                 max_uvw = abs_disp;
             }
@@ -262,7 +271,7 @@ void getNonlinearBucklingKDF(MPI_Comm comm, int run,
 
     // nonlinear static important input settings
     // ------------------------------------------------------------
-    double lambda_init = linear_eigval * 0.05;
+    double lambda_init = TacsRealPart(linear_eigval) * 0.05;
     double target_delta_lambda = 5.0;
     int max_continuation_iters = 800; // default 300 // for prelim Newton solve to lambda_init
     int max_correction_iters = 100; // for the arc length method static regime
@@ -474,7 +483,7 @@ void getNonlinearBucklingKDF(MPI_Comm comm, int run,
         if (fail_flag) {
             num_failures++;
             if (num_failures >= 3) {
-                printf("Failed to converge anymore.. stopped at lambda = %.5f\n", lambda);
+                printf("Failed to converge anymore.. stopped at lambda = %.5f\n", TacsRealPart(lambda));
                 break; // exit the loop
             }
         }
@@ -496,7 +505,7 @@ void getNonlinearBucklingKDF(MPI_Comm comm, int run,
             buckling->solve_local(NULL, vars, ksm_print_buckling, delta_vars);
             eigval = buckling->extractEigenvalue(0, &loc_error);
 
-            if (eigval < 10.0) {
+            if (TacsRealPart(eigval) < 10.0 && useEigvals) {
                 // now set more rapid buckling checking near the final eigenvalue
                 num_arclength_per_lbuckle = 3;
             }
@@ -564,7 +573,7 @@ void getNonlinearBucklingKDF(MPI_Comm comm, int run,
 
         // eigenvalue based stopping criterion
         if (iarclength % num_arclength_per_lbuckle == 0 && iarclength != 0 && useEigvals) {
-            printf("eigval = %.8e\n", eigval);
+            printf("eigval = %.8e\n", TacsRealPart(eigval));
             if (TacsRealPart(eigval) < conv_eigval || TacsRealPart(loc_error) > 1e-1 || std::isnan(TacsRealPart(loc_error))) {
                 nonlinear_eigval = lambda;
                 break; // break out of the arc length loop and we are done with nonlinear buckling!
@@ -572,7 +581,7 @@ void getNonlinearBucklingKDF(MPI_Comm comm, int run,
         }
 
         // load-disp curve stopping criterion
-        if (TacsRealPart(c_slope / init_slope) < conv_slope_frac && !useEigvals) {
+        if (TacsRealPart(c_slope / init_slope) < conv_slope_frac && iarclength > 0 && !useEigvals) {
             // buckling
             nonlinear_eigval = lambda;
             break;
@@ -586,8 +595,8 @@ void getNonlinearBucklingKDF(MPI_Comm comm, int run,
 
     // compute the KDF
     TacsScalar KDF = nonlinear_eigval / linear_eigval;
-    printf("LIN eigval %.5e, NL eigval %.5e\n", linear_eigval, nonlinear_eigval);
-    printf("KDF %.5e\n", KDF);
+    printf("LIN eigval %.5e, NL eigval %.5e\n", TacsRealPart(linear_eigval), TacsRealPart(nonlinear_eigval));
+    printf("KDF %.5e\n", TacsRealPart(KDF));
 
     // compare with literature KDF based on r/t from NASA SP-8007
     // TacsScalar rt = R / t;
